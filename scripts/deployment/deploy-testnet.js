@@ -131,16 +131,29 @@ async function verifyContracts(deployments) {
   console.log("Waiting 60 seconds for Polygonscan to index...");
   await new Promise(resolve => setTimeout(resolve, 60000));
   
-  for (const [name, address] of Object.entries(deployments)) {
+  const verificationData = [
+    { name: "emergencyModule", address: deployments.emergencyModule, constructorArguments: [] },
+    { name: "factory", address: deployments.factory, constructorArguments: ["0x0000000000000000000000000000000000000000", deployments.emergencyModule] },
+    { name: "strand1", address: deployments.strand1, constructorArguments: [deployments.factory] },
+    { name: "strand2", address: deployments.strand2, constructorArguments: [deployments.factory] },
+    { name: "strand3", address: deployments.strand3, constructorArguments: [deployments.factory] },
+    { name: "rrlEngine", address: deployments.rrlEngine, constructorArguments: [deployments.factory, [deployments.strand1, deployments.strand2, deployments.strand3]] },
+    { name: "btcAccumulator", address: deployments.btcAccumulator, constructorArguments: [deployments.factory, process.env.WBTC_ADDRESS, process.env.QUICKSWAP_ROUTER] },
+    { name: "lender", address: deployments.lender, constructorArguments: [deployments.factory, process.env.AAVE_POOL_ADDRESS, process.env.USDC_ADDRESS] },
+    { name: "megaVault", address: deployments.megaVault, constructorArguments: [deployments.factory, deployments.rrlEngine, deployments.btcAccumulator, [deployments.strand1, deployments.strand2, deployments.strand3]] }
+  ];
+  
+  for (const contract of verificationData) {
     try {
-      console.log(`\nVerifying ${name} at ${address}...`);
+      console.log(`\nVerifying ${contract.name} at ${contract.address}...`);
       await hre.run("verify:verify", {
-        address: address,
+        address: contract.address,
+        constructorArguments: contract.constructorArguments,
         network: "amoy"
       });
-      console.log(`✅ ${name} verified`);
+      console.log(`✅ ${contract.name} verified`);
     } catch (error) {
-      console.log(`⚠️ ${name} verification failed:`, error.message);
+      console.log(`⚠️ ${contract.name} verification failed:`, error.message);
     }
   }
 }

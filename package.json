@@ -8,7 +8,9 @@
     "test:coverage": "npx hardhat coverage",
     "compile": "npx hardhat compile",
     "size": "npx hardhat size-contracts",
-    "deploy:amoy": "npx hardhat run scripts/deployment/deploy-testnet.js --network amoy"
+    "deploy:amoy": "npx hardhat run scripts/deployment/deploy-testnet.js --network amoy",
+    "validate:testnet": "npx hardhat run scripts/verification/test-testnet.js --network amoy",
+    "check:protocols": "npx hardhat run scripts/utils/check-external-protocols.js --network amoy"
   },
   "keywords": [],
   "author": "",

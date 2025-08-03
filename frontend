@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Database, Settings, User, Users, TrendingUp, Info, X, Bitcoin, DollarSign, Zap, Shield, ArrowLeft, Wallet, Home, Share2, MessageSquare, Heart, Reply, Plus, Filter, Search } from 'lucide-react';
 
-// Replace with your actual contract address and ABI
-const VAULT_CONTRACT_ADDRESS = "0xYourVaultContractAddressHere";
+const CONTRACT_ADDRESSES = {
+  amoy: {
+    factory: process.env.REACT_APP_FACTORY_ADDRESS_AMOY || "",
+    megaVault: process.env.REACT_APP_MEGA_VAULT_ADDRESS_AMOY || "",
+    rrlEngine: process.env.REACT_APP_RRL_ENGINE_ADDRESS_AMOY || "",
+    btcAccumulator: process.env.REACT_APP_BTC_ACCUMULATOR_ADDRESS_AMOY || ""
+  }
+};
+
 const VAULT_CONTRACT_ABI = [
   "function balanceOf(address) view returns (uint256)",
   "function deposit(uint256 amount) external",
   "function harvestAndRoute() external",
   "function getTotalMembers() view returns (uint256)",
   "function getMemberInfo(address) view returns (uint256, uint256, bool)",
-  "function getVaultStats() view returns (uint256, uint256, uint256, uint256)",
-  // Add other contract functions as needed
+  "function getVaultStats() view returns (uint256, uint256, uint256, uint256)"
 ];
 
 // Connect wallet and return address or null
@@ -28,25 +34,48 @@ async function connectWallet() {
   }
 }
 
-// Get vault balance for address - fallback version without ethers dependency
 async function getVaultBalance(address) {
-  // Since ethers may not be available, return mock data for now
-  // In production, implement proper Web3 calls
-  return "0";
+  if (!window.ethereum) return "0";
+  
+  try {
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const contract = new ethers.Contract(
+      CONTRACT_ADDRESSES.amoy.megaVault,
+      VAULT_CONTRACT_ABI,
+      provider
+    );
+    const balance = await contract.balanceOf(address);
+    return ethers.utils.formatUnits(balance, 6);
+  } catch (error) {
+    console.error("Error fetching vault balance:", error);
+    return "0";
+  }
 }
 
-// Get vault stats from contract - fallback version
 async function getVaultStats() {
-  // Return consistent mock data - if no real deposits, vault should be empty
-  return { 
-    totalMembers: 0, 
-    totalDeposits: "0", 
-    systemHealth: 100, 
-    transactions: 0,
-    strand1Balance: "0",
-    strand2Balance: "0",
-    strand3Balance: "0" 
-  };
+  if (!window.ethereum) return { totalMembers: 0, totalDeposits: "0", systemHealth: 100, transactions: 0 };
+  
+  try {
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const contract = new ethers.Contract(
+      CONTRACT_ADDRESSES.amoy.megaVault,
+      VAULT_CONTRACT_ABI,
+      provider
+    );
+    const stats = await contract.getVaultStats();
+    return {
+      totalMembers: stats[0].toNumber(),
+      totalDeposits: ethers.utils.formatUnits(stats[1], 6),
+      systemHealth: 100,
+      transactions: stats[3].toNumber(),
+      strand1Balance: ethers.utils.formatUnits(stats[4] || 0, 6),
+      strand2Balance: ethers.utils.formatUnits(stats[5] || 0, 6),
+      strand3Balance: ethers.utils.formatUnits(stats[6] || 0, 6)
+    };
+  } catch (error) {
+    console.error("Error fetching vault stats:", error);
+    return { totalMembers: 0, totalDeposits: "0", systemHealth: 100, transactions: 0 };
+  }
 }
 
 // Get AAVE lending rates
@@ -101,43 +130,86 @@ async function getBitcoinPrice() {
   }
 }
 
-// Get member allocation data from contract
 async function getMemberAllocation() {
-  // Return empty array since no real deposits have been made
-  return [];
+  if (!window.ethereum) return [];
+  
+  try {
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const contract = new ethers.Contract(
+      CONTRACT_ADDRESSES.amoy.megaVault,
+      VAULT_CONTRACT_ABI,
+      provider
+    );
+    const totalMembers = await contract.getTotalMembers();
+    const allocations = [];
+    
+    for (let i = 0; i < totalMembers; i++) {
+      const memberInfo = await contract.getMemberInfo(i);
+      allocations.push({
+        address: memberInfo[0],
+        allocation: parseFloat(ethers.utils.formatUnits(memberInfo[1], 6)),
+        sharePercentage: memberInfo[2].toNumber() / 100
+      });
+    }
+    
+    return allocations;
+  } catch (error) {
+    console.error("Error fetching member allocation:", error);
+    return [];
+  }
 }
 
-// Deposit amount (in ether) to vault contract
-async function depositToVault(amountEther) {
+async function depositToVault(amountUSDC) {
   if (!window.ethereum) {
     alert("MetaMask is required to use this app.");
     return false;
   }
   try {
-    // Simulate deposit for demo purposes
-    console.log(`Depositing ${amountEther} to vault...`);
-    alert(`Demo mode: Automated deposit of ${amountEther} successful!`);
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer = provider.getSigner();
+    const contract = new ethers.Contract(
+      CONTRACT_ADDRESSES.amoy.megaVault,
+      VAULT_CONTRACT_ABI,
+      signer
+    );
+    
+    const amountWei = ethers.utils.parseUnits(amountUSDC.toString(), 6);
+    const tx = await contract.deposit(amountWei);
+    await tx.wait();
+    
+    console.log(`Deposited ${amountUSDC} USDC to vault`);
+    alert(`Successfully deposited ${amountUSDC} USDC to vault!`);
     return true;
   } catch (error) {
     console.error("Deposit failed:", error);
-    alert("Deposit transaction failed.");
+    alert("Deposit transaction failed: " + error.message);
     return false;
   }
 }
 
-// Harvest and route yields
 async function harvestAndRoute() {
   if (!window.ethereum) {
     alert("MetaMask is required to use this app.");
     return false;
   }
   try {
-    // Simulate harvest for demo purposes
-    alert("Demo mode: Harvest simulation successful!");
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer = provider.getSigner();
+    const contract = new ethers.Contract(
+      CONTRACT_ADDRESSES.amoy.megaVault,
+      VAULT_CONTRACT_ABI,
+      signer
+    );
+    
+    const tx = await contract.harvestAndRoute();
+    await tx.wait();
+    
+    console.log("Harvest and route completed");
+    alert("Harvest and route completed successfully!");
     return true;
   } catch (error) {
     console.error("Harvest failed:", error);
-    alert("Harvest transaction failed.");
+    alert("Harvest transaction failed: " + error.message);
     return false;
   }
 }

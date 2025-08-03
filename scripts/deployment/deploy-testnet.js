@@ -11,6 +11,26 @@ async function main() {
   const deployments = {};
 
   try {
+    console.log("\n0. Deploying Mock External Protocols...");
+    
+    const MockAavePool = await ethers.getContractFactory("MockAavePool");
+    const mockAavePool = await MockAavePool.deploy();
+    await mockAavePool.deployed();
+    deployments.mockAavePool = mockAavePool.address;
+    console.log("✅ MockAavePool deployed to:", mockAavePool.address);
+    
+    const MockQuickSwapRouter = await ethers.getContractFactory("MockQuickSwapRouter");
+    const mockQuickSwapRouter = await MockQuickSwapRouter.deploy();
+    await mockQuickSwapRouter.deployed();
+    deployments.mockQuickSwapRouter = mockQuickSwapRouter.address;
+    console.log("✅ MockQuickSwapRouter deployed to:", mockQuickSwapRouter.address);
+    
+    const MockWBTC = await ethers.getContractFactory("MockWBTC");
+    const mockWBTC = await MockWBTC.deploy();
+    await mockWBTC.deployed();
+    deployments.mockWBTC = mockWBTC.address;
+    console.log("✅ MockWBTC deployed to:", mockWBTC.address);
+
     console.log("\n1. Deploying EmergencyModule...");
     const EmergencyModule = await ethers.getContractFactory("EmergencyModule");
     const emergencyModule = await EmergencyModule.deploy();
@@ -61,8 +81,8 @@ async function main() {
     const BTCAccumulator = await ethers.getContractFactory("BTCAccumulator");
     const btcAccumulator = await BTCAccumulator.deploy(
       factory.address,
-      process.env.WBTC_ADDRESS,
-      process.env.QUICKSWAP_ROUTER
+      deployments.mockWBTC,
+      deployments.mockQuickSwapRouter
     );
     await btcAccumulator.deployed();
     deployments.btcAccumulator = btcAccumulator.address;
@@ -72,7 +92,7 @@ async function main() {
     const SubscriptionLender = await ethers.getContractFactory("SubscriptionLender");
     const lender = await SubscriptionLender.deploy(
       factory.address,
-      process.env.AAVE_POOL_ADDRESS,
+      deployments.mockAavePool,
       process.env.USDC_ADDRESS
     );
     await lender.deployed();
@@ -132,14 +152,17 @@ async function verifyContracts(deployments) {
   await new Promise(resolve => setTimeout(resolve, 60000));
   
   const verificationData = [
+    { name: "mockAavePool", address: deployments.mockAavePool, constructorArguments: [] },
+    { name: "mockQuickSwapRouter", address: deployments.mockQuickSwapRouter, constructorArguments: [] },
+    { name: "mockWBTC", address: deployments.mockWBTC, constructorArguments: [] },
     { name: "emergencyModule", address: deployments.emergencyModule, constructorArguments: [] },
     { name: "factory", address: deployments.factory, constructorArguments: ["0x0000000000000000000000000000000000000000", deployments.emergencyModule] },
     { name: "strand1", address: deployments.strand1, constructorArguments: [deployments.factory] },
     { name: "strand2", address: deployments.strand2, constructorArguments: [deployments.factory] },
     { name: "strand3", address: deployments.strand3, constructorArguments: [deployments.factory] },
     { name: "rrlEngine", address: deployments.rrlEngine, constructorArguments: [deployments.factory, [deployments.strand1, deployments.strand2, deployments.strand3]] },
-    { name: "btcAccumulator", address: deployments.btcAccumulator, constructorArguments: [deployments.factory, process.env.WBTC_ADDRESS, process.env.QUICKSWAP_ROUTER] },
-    { name: "lender", address: deployments.lender, constructorArguments: [deployments.factory, process.env.AAVE_POOL_ADDRESS, process.env.USDC_ADDRESS] },
+    { name: "btcAccumulator", address: deployments.btcAccumulator, constructorArguments: [deployments.factory, deployments.mockWBTC, deployments.mockQuickSwapRouter] },
+    { name: "lender", address: deployments.lender, constructorArguments: [deployments.factory, deployments.mockAavePool, process.env.USDC_ADDRESS] },
     { name: "megaVault", address: deployments.megaVault, constructorArguments: [deployments.factory, deployments.rrlEngine, deployments.btcAccumulator, [deployments.strand1, deployments.strand2, deployments.strand3]] }
   ];
   

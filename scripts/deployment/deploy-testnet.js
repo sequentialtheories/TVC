@@ -41,7 +41,7 @@ async function main() {
     console.log("\n2. Deploying MegaVaultFactory...");
     const MegaVaultFactory = await ethers.getContractFactory("MegaVaultFactory");
     const factory = await MegaVaultFactory.deploy(
-      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000001",
       emergencyModule.address
     );
     await factory.deployed();
@@ -70,8 +70,7 @@ async function main() {
     console.log("\n4. Deploying RRLEngine...");
     const RRLEngine = await ethers.getContractFactory("RRLEngine");
     const rrlEngine = await RRLEngine.deploy(
-      factory.address,
-      [strand1.address, strand2.address, strand3.address]
+      factory.address
     );
     await rrlEngine.deployed();
     deployments.rrlEngine = rrlEngine.address;
@@ -102,10 +101,12 @@ async function main() {
     console.log("\n7. Deploying MegaVault...");
     const MegaVault = await ethers.getContractFactory("MegaVault");
     const megaVault = await MegaVault.deploy(
-      factory.address,
+      strand1.address,
+      strand2.address,
+      strand3.address,
       rrlEngine.address,
       btcAccumulator.address,
-      [strand1.address, strand2.address, strand3.address]
+      emergencyModule.address
     );
     await megaVault.deployed();
     deployments.megaVault = megaVault.address;
@@ -113,7 +114,7 @@ async function main() {
 
     console.log("\n8. Configuring contracts...");
     await factory.updateMegaVault(megaVault.address);
-    console.log("✅ MegaVault set in factory");
+    console.log("✅ MegaVault address updated in factory");
 
     await emergencyModule.authorizeContract(factory.address);
     await emergencyModule.authorizeContract(megaVault.address);
@@ -156,14 +157,14 @@ async function verifyContracts(deployments) {
     { name: "mockQuickSwapRouter", address: deployments.mockQuickSwapRouter, constructorArguments: [] },
     { name: "mockWBTC", address: deployments.mockWBTC, constructorArguments: [] },
     { name: "emergencyModule", address: deployments.emergencyModule, constructorArguments: [] },
-    { name: "factory", address: deployments.factory, constructorArguments: ["0x0000000000000000000000000000000000000000", deployments.emergencyModule] },
+    { name: "factory", address: deployments.factory, constructorArguments: [deployments.emergencyModule, deployments.emergencyModule] },
     { name: "strand1", address: deployments.strand1, constructorArguments: [deployments.factory] },
     { name: "strand2", address: deployments.strand2, constructorArguments: [deployments.factory] },
     { name: "strand3", address: deployments.strand3, constructorArguments: [deployments.factory] },
-    { name: "rrlEngine", address: deployments.rrlEngine, constructorArguments: [deployments.factory, [deployments.strand1, deployments.strand2, deployments.strand3]] },
+    { name: "rrlEngine", address: deployments.rrlEngine, constructorArguments: [deployments.factory] },
     { name: "btcAccumulator", address: deployments.btcAccumulator, constructorArguments: [deployments.factory, deployments.mockWBTC, deployments.mockQuickSwapRouter] },
     { name: "lender", address: deployments.lender, constructorArguments: [deployments.factory, deployments.mockAavePool, process.env.USDC_ADDRESS] },
-    { name: "megaVault", address: deployments.megaVault, constructorArguments: [deployments.factory, deployments.rrlEngine, deployments.btcAccumulator, [deployments.strand1, deployments.strand2, deployments.strand3]] }
+    { name: "megaVault", address: deployments.megaVault, constructorArguments: [deployments.strand1, deployments.strand2, deployments.strand3, deployments.rrlEngine, deployments.btcAccumulator, deployments.emergencyModule] }
   ];
   
   for (const contract of verificationData) {

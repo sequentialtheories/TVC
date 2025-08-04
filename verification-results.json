@@ -1,0 +1,53 @@
+{
+  "verified": [],
+  "failed": [
+    {
+      "name": "MockAavePool",
+      "error": "Invalid API Key (#err2)|POLYTestNet"
+    },
+    {
+      "name": "MockQuickSwapRouter",
+      "error": "Invalid API Key (#err2)|POLYTestNet"
+    },
+    {
+      "name": "MockWBTC",
+      "error": "Too many invalid api key attempts, please try again later"
+    },
+    {
+      "name": "EmergencyModule",
+      "error": "Invalid API Key (#err2)|POLYTestNet"
+    },
+    {
+      "name": "MegaVaultFactory",
+      "error": "Invalid API Key (#err2)|POLYTestNet"
+    },
+    {
+      "name": "StrandManagerCapital",
+      "error": "Invalid API Key (#err2)|POLYTestNet"
+    },
+    {
+      "name": "StrandManagerYield",
+      "error": "Too many invalid api key attempts, please try again later"
+    },
+    {
+      "name": "StrandManagerMomentum",
+      "error": "Invalid API Key (#err2)|POLYTestNet"
+    },
+    {
+      "name": "RRLEngine",
+      "error": "Invalid API Key (#err2)|POLYTestNet"
+    },
+    {
+      "name": "BTCAccumulator",
+      "error": "Too many invalid api key attempts, please try again later"
+    },
+    {
+      "name": "SubscriptionLender",
+      "error": "Invalid API Key (#err2)|POLYTestNet"
+    },
+    {
+      "name": "MegaVault",
+      "error": "Invalid API Key (#err2)|POLYTestNet"
+    }
+  ]
+}

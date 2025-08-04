@@ -1,7 +1,7 @@
 {
   "name": "tvc",
   "version": "1.0.0",
-  "description": "",
+  "description": "TVC (The Vault Club) - DeFi investment platform with 8 core smart contracts deployed to Amoy testnet",
   "main": "index.js",
   "scripts": {
     "test": "npx hardhat test",

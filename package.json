@@ -9,6 +9,11 @@
     "compile": "npx hardhat compile",
     "size": "npx hardhat size-contracts",
     "deploy:amoy": "npx hardhat run scripts/deployment/deploy-testnet.js --network amoy",
+    "deploy:mvp": "npx hardhat run scripts/deployment/deploy-mvp.js --network amoy",
+    "deploy:batch1": "BATCH_TYPE=batch1 npx hardhat run scripts/deployment/deploy-batch.js --network amoy",
+    "deploy:batch2": "BATCH_TYPE=batch2 npx hardhat run scripts/deployment/deploy-batch.js --network amoy",
+    "deploy:batch3": "BATCH_TYPE=batch3 npx hardhat run scripts/deployment/deploy-batch.js --network amoy",
+    "deploy:full": "npm run deploy:batch1 && npm run deploy:batch2 && npm run deploy:batch3",
     "validate:testnet": "npx hardhat run scripts/verification/test-testnet.js --network amoy",
     "check:protocols": "npx hardhat run scripts/utils/check-external-protocols.js --network amoy"
   },

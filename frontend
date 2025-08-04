@@ -3,10 +3,18 @@ import { Database, Settings, User, Users, TrendingUp, Info, X, Bitcoin, DollarSi
 
 const CONTRACT_ADDRESSES = {
   amoy: {
-    factory: process.env.REACT_APP_FACTORY_ADDRESS_AMOY || "",
-    megaVault: process.env.REACT_APP_MEGA_VAULT_ADDRESS_AMOY || "",
-    rrlEngine: process.env.REACT_APP_RRL_ENGINE_ADDRESS_AMOY || "",
-    btcAccumulator: process.env.REACT_APP_BTC_ACCUMULATOR_ADDRESS_AMOY || ""
+    factory: "0xA13ac45069a1a1Cd588776f5824bbf893EBa980e",
+    megaVault: "0x6C19DF9bb8C05630A5405987b16EAEc2f2Eed4E9",
+    emergencyModule: "0x86ca532961Eca50B61f7A2766bb9d91E403f79BA",
+    strand1: "0x4d2E7dbb67bB82E3f6e8aDF920588932ED7d5d42",
+    strand2: "0xf8466c6af264DDA1c5b4EEcDAE416Fd708DeB3e7",
+    strand3: "0x7646c34d7C904c6A62d0FC46199d9363E34aD38D",
+    rrlEngine: "0x41B06B936c67b22b8559973B885eF1c7778c39C5",
+    btcAccumulator: "0xfdD2AD07e7C7314B1FB0ebb3C6d0A3d1D304CA83",
+    lender: "0x73CC7F40c47b9735183b0E19c41F08aE47648549",
+    mockAavePool: "0x6C56d2f9A1a139E2EdB04B0875E7e1cc3d4E3684",
+    mockQuickSwapRouter: "0x877036E4679f49bF012A968ee3dd3f678Bd1Ef87",
+    mockWBTC: "0xcfdA8DD5A33B5BCA870dc7252a540197b65afe4C"
   }
 };
 

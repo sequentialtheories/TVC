@@ -28,7 +28,8 @@ interface IMegaVaultFactory {
     function createSubClub(
         address[] memory members,
         uint256 lockPeriod,
-        RigorLevel rigor
+        RigorLevel rigor,
+        bool isCharged
     ) external returns (address);
     
     function getSubClub(address user) external view returns (address);

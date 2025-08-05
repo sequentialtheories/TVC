@@ -23,6 +23,7 @@ contract SubClub is ISubClub, Ownable, ReentrancyGuard, Pausable {
     uint256 public contractStartTime;
     uint256 public lastDepositWeek;
     uint256 public globalFee;
+    bool public isCharged;
     
     address public megaVault;
     address public emergencyModule;
@@ -64,10 +65,15 @@ contract SubClub is ISubClub, Ownable, ReentrancyGuard, Pausable {
         RigorLevel _rigorLevel,
         address _megaVault,
         address _emergencyModule,
-        uint256 _globalFee
+        uint256 _globalFee,
+        bool _isCharged
     ) {
-        require(_members.length >= 4 && _members.length <= 8, "Invalid member count");
-        require(_lockPeriod >= 365 days && _lockPeriod <= 20 * 365 days, "Invalid lock period");
+        require(_members.length >= 1 && _members.length <= 8, "Invalid member count");
+        require(
+            (_isCharged && _lockPeriod >= 30 days && _lockPeriod <= 365 days) || 
+            (!_isCharged && _lockPeriod >= 365 days && _lockPeriod <= 20 * 365 days), 
+            "Invalid lock period"
+        );
         require(_megaVault != address(0), "Invalid MegaVault address");
         require(_emergencyModule != address(0), "Invalid EmergencyModule address");
         
@@ -76,6 +82,7 @@ contract SubClub is ISubClub, Ownable, ReentrancyGuard, Pausable {
         megaVault = _megaVault;
         emergencyModule = _emergencyModule;
         globalFee = _globalFee;
+        isCharged = _isCharged;
         contractStartTime = block.timestamp;
         
         // Set weekly deposit amount based on rigor level
@@ -239,7 +246,7 @@ contract SubClub is ISubClub, Ownable, ReentrancyGuard, Pausable {
             lockPeriod: lockPeriod,
             rigor: rigorLevel,
             weeklyAmount: weeklyDepositAmount,
-            isCharged: false, // TODO: Implement charged contract logic
+            isCharged: isCharged,
             startTime: contractStartTime,
             currentPhase: phase2Active ? ISubClub.Phase.PHASE_2 : ISubClub.Phase.PHASE_1,
             isCompleted: block.timestamp >= contractStartTime + lockPeriod,

@@ -1,4 +1,5 @@
 const hre = require("hardhat");
+const { ethers } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
@@ -27,7 +28,8 @@ async function main() {
     const tx = await factory.createSubClub(
       members,
       365 * 24 * 60 * 60,
-      1
+      1,
+      false
     );
     const receipt = await tx.wait();
     

@@ -72,7 +72,7 @@ describe("MegaVaultFactory", function () {
             const lockPeriod = 365 * 24 * 60 * 60; // 1 year
             const rigor = 0; // LIGHT
             
-            const tx = await factory.createSubClub(members, lockPeriod, rigor);
+            const tx = await factory.createSubClub(members, lockPeriod, rigor, false);
             const receipt = await tx.wait();
             
             const event = receipt.events.find(e => e.event === "SubClubCreated");
@@ -87,7 +87,7 @@ describe("MegaVaultFactory", function () {
         
         it("Should fail with invalid member count", async function () {
             await expect(
-                factory.createSubClub([user1.address, user2.address], 365 * 24 * 60 * 60, 0)
+                factory.createSubClub([], 365 * 24 * 60 * 60, 0, false)
             ).to.be.revertedWith("Invalid member count");
             
             const tooManyMembers = [
@@ -95,7 +95,7 @@ describe("MegaVaultFactory", function () {
                 user5.address, user6.address, user7.address, user8.address, user9.address
             ];
             await expect(
-                factory.createSubClub(tooManyMembers, 365 * 24 * 60 * 60, 0)
+                factory.createSubClub(tooManyMembers, 365 * 24 * 60 * 60, 0, false)
             ).to.be.revertedWith("Invalid member count");
         });
         
@@ -103,19 +103,19 @@ describe("MegaVaultFactory", function () {
             const members = [user1.address, user2.address, user3.address, user4.address];
             
             await expect(
-                factory.createSubClub(members, 30 * 24 * 60 * 60, 0) // 30 days
-            ).to.be.revertedWith("Invalid lock period");
+                factory.createSubClub(members, 30 * 24 * 60 * 60, 0, false) // 30 days
+            ).to.be.revertedWith("Invalid traditional contract lock period");
             
             await expect(
-                factory.createSubClub(members, 25 * 365 * 24 * 60 * 60, 0) // 25 years
-            ).to.be.revertedWith("Invalid lock period");
+                factory.createSubClub(members, 25 * 365 * 24 * 60 * 60, 0, false) // 25 years
+            ).to.be.revertedWith("Invalid traditional contract lock period");
         });
         
         it("Should fail with duplicate members", async function () {
             const members = [user1.address, user2.address, user1.address, user4.address];
             
             await expect(
-                factory.createSubClub(members, 365 * 24 * 60 * 60, 0)
+                factory.createSubClub(members, 365 * 24 * 60 * 60, 0, false)
             ).to.be.revertedWith("Duplicate member");
         });
         
@@ -123,10 +123,10 @@ describe("MegaVaultFactory", function () {
             const members1 = [user1.address, user2.address, user3.address, user4.address];
             const members2 = [user1.address, user5.address, user6.address, user7.address];
             
-            await factory.createSubClub(members1, 365 * 24 * 60 * 60, 0);
+            await factory.createSubClub(members1, 365 * 24 * 60 * 60, 0, false);
             
             await expect(
-                factory.createSubClub(members2, 365 * 24 * 60 * 60, 0)
+                factory.createSubClub(members2, 365 * 24 * 60 * 60, 0, false)
             ).to.be.revertedWith("Member already in subclub");
         });
     });
@@ -147,7 +147,7 @@ describe("MegaVaultFactory", function () {
             
             const members = [user1.address, user2.address, user3.address, user4.address];
             await expect(
-                factory.createSubClub(members, 365 * 24 * 60 * 60, 0)
+                factory.createSubClub(members, 365 * 24 * 60 * 60, 0, false)
             ).to.be.revertedWith("Emergency paused");
         });
     });

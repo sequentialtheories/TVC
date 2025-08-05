@@ -7,7 +7,7 @@ import "../interfaces/IMegaVaultFactory.sol";
 import "../interfaces/ISubClub.sol";
 import "../interfaces/IMegaVault.sol";
 import "../interfaces/IEmergencyModule.sol";
-// import "./SubClub.sol"; // Will be uncommented after SubClub implementation
+import "./SubClub.sol";
 
 contract MegaVaultFactory is IMegaVaultFactory, Ownable, ReentrancyGuard {
     // State variables
@@ -21,7 +21,7 @@ contract MegaVaultFactory is IMegaVaultFactory, Ownable, ReentrancyGuard {
     bool public emergencyPaused;
     
     // Constants
-    uint256 public constant MIN_MEMBERS = 4;
+    uint256 public constant MIN_MEMBERS = 1;
     uint256 public constant MAX_MEMBERS = 8;
     uint256 public constant MIN_LOCK_PERIOD = 365 days; // 1 year minimum
     uint256 public constant MAX_LOCK_PERIOD = 20 * 365 days; // 20 years maximum
@@ -40,11 +40,12 @@ contract MegaVaultFactory is IMegaVaultFactory, Ownable, ReentrancyGuard {
         _;
     }
     
-    modifier validLockPeriod(uint256 lockPeriod) {
-        require(
-            lockPeriod >= MIN_LOCK_PERIOD && lockPeriod <= MAX_LOCK_PERIOD,
-            "Invalid lock period"
-        );
+    modifier validLockPeriod(uint256 lockPeriod, bool isCharged) {
+        if (isCharged) {
+            require(lockPeriod >= 30 days && lockPeriod <= 365 days, "Invalid charged contract lock period");
+        } else {
+            require(lockPeriod >= MIN_LOCK_PERIOD && lockPeriod <= MAX_LOCK_PERIOD, "Invalid traditional contract lock period");
+        }
         _;
     }
     
@@ -80,31 +81,29 @@ contract MegaVaultFactory is IMegaVaultFactory, Ownable, ReentrancyGuard {
     function createSubClub(
         address[] memory members,
         uint256 lockPeriod,
-        RigorLevel rigor
+        RigorLevel rigor,
+        bool isCharged
     ) 
         external 
         override
         nonReentrant
         notEmergencyPaused
         validMemberCount(members)
-        validLockPeriod(lockPeriod)
+        validLockPeriod(lockPeriod, isCharged)
         noDuplicateMembers(members)
         returns (address subClubAddress) 
     {
-        // TODO: Deploy new SubClub contract after SubClub implementation
-        // SubClub newSubClub = new SubClub(
-        //     members,
-        //     lockPeriod,
-        //     rigor,
-        //     megaVault,
-        //     emergencyModule,
-        //     globalFee
-        // );
+        SubClub newSubClub = new SubClub(
+            members,
+            lockPeriod,
+            ISubClub.RigorLevel(uint8(rigor)),
+            megaVault,
+            emergencyModule,
+            globalFee,
+            isCharged
+        );
         
-        // subClubAddress = address(newSubClub);
-        
-        // Temporary placeholder - will be replaced with actual SubClub deployment
-        subClubAddress = address(0x1234567890123456789012345678901234567890);
+        subClubAddress = address(newSubClub);
         
         // Update mappings
         isValidSubClub[subClubAddress] = true;

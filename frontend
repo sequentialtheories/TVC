@@ -13,40 +13,140 @@ const VAULT_CONTRACT_ABI = [
   // Add other contract functions as needed
 ];
 
-// Connect wallet and return address or null
+// Connect wallet with Sequence Theory SSO integration
 async function connectWallet() {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return null;
-  }
   try {
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-    return accounts[0];
+    // Try TVC backend authentication first
+    const API_BASE_URL = 'https://your-supabase-url.supabase.co/functions/v1';
+    const VAULT_CLUB_API_KEY = 'your-vault-club-api-key';
+    
+    const stToken = localStorage.getItem('st_token');
+    let authResult;
+    
+    if (stToken) {
+      // Exchange ST token for vault session
+      const response = await fetch(`${API_BASE_URL}/vault-auth/exchange-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-vault-club-api-key': VAULT_CLUB_API_KEY
+        },
+        body: JSON.stringify({ st_token: stToken })
+      });
+      
+      const data = await response.json();
+      if (data.success && data.data.wallet) {
+        localStorage.setItem('vault_access_token', data.data.access_token);
+        return data.data.wallet.address;
+      }
+    } else {
+      // Demo credentials for testing
+      const response = await fetch(`${API_BASE_URL}/vault-auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-vault-club-api-key': VAULT_CLUB_API_KEY
+        },
+        body: JSON.stringify({
+          email: 'demo@sequencetheory.com',
+          password: 'demo_password'
+        })
+      });
+      
+      const data = await response.json();
+      if (data.success && data.data.wallet) {
+        localStorage.setItem('vault_access_token', data.data.access_token);
+        localStorage.setItem('st_token', data.data.st_token);
+        return data.data.wallet.address;
+      }
+    }
+    
+    throw new Error('TVC authentication failed');
   } catch (error) {
-    console.error("Wallet connection rejected", error);
-    return null;
+    console.error('TVC authentication failed, falling back to MetaMask:', error);
+    
+    // Fallback to MetaMask if TVC auth fails
+    if (!window.ethereum) {
+      alert("MetaMask is required to use this app.");
+      return null;
+    }
+    try {
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      return accounts[0];
+    } catch (metaMaskError) {
+      console.error("Wallet connection rejected", metaMaskError);
+      return null;
+    }
   }
 }
 
-// Get vault balance for address - fallback version without ethers dependency
+// Get vault balance for address - integrated with TVC backend API
 async function getVaultBalance(address) {
-  // Since ethers may not be available, return mock data for now
-  // In production, implement proper Web3 calls
-  return "0";
+  try {
+    const API_BASE_URL = 'https://your-supabase-url.supabase.co/functions/v1';
+    const VAULT_CLUB_API_KEY = 'your-vault-club-api-key';
+    const token = localStorage.getItem('vault_access_token');
+    
+    const response = await fetch(`${API_BASE_URL}/vault-operations/progress`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-vault-club-api-key': VAULT_CLUB_API_KEY,
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      return data.data?.total_balance?.toString() || "0";
+    }
+    throw new Error(data.error || 'Failed to fetch balance');
+  } catch (error) {
+    console.error('Error fetching vault balance from TVC API:', error);
+    return "0"; // Fallback
+  }
 }
 
-// Get vault stats from contract - fallback version
+// Get vault stats from TVC backend API
 async function getVaultStats() {
-  // Return consistent mock data - if no real deposits, vault should be empty
-  return { 
-    totalMembers: 0, 
-    totalDeposits: "0", 
-    systemHealth: 100, 
-    transactions: 0,
-    strand1Balance: "0",
-    strand2Balance: "0",
-    strand3Balance: "0" 
-  };
+  try {
+    const API_BASE_URL = 'https://your-supabase-url.supabase.co/functions/v1';
+    const VAULT_CLUB_API_KEY = 'your-vault-club-api-key';
+    const token = localStorage.getItem('vault_access_token');
+    
+    const response = await fetch(`${API_BASE_URL}/vault-operations/progress`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-vault-club-api-key': VAULT_CLUB_API_KEY,
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      const stats = data.data || {};
+      return {
+        totalMembers: stats.total_members || 0,
+        totalDeposits: stats.total_tvl?.toString() || "0",
+        systemHealth: 100,
+        transactions: stats.total_transactions || 0,
+        strand1Balance: stats.strand1_balance?.toString() || "0",
+        strand2Balance: stats.strand2_balance?.toString() || "0",
+        strand3Balance: stats.strand3_balance?.toString() || "0"
+      };
+    }
+    throw new Error(data.error || 'Failed to fetch stats');
+  } catch (error) {
+    console.error('Error fetching vault stats from TVC API:', error);
+    return { 
+      totalMembers: 0, 
+      totalDeposits: "0", 
+      systemHealth: 100, 
+      transactions: 0,
+      strand1Balance: "0",
+      strand2Balance: "0",
+      strand3Balance: "0" 
+    };
+  }
 }
 
 // Get AAVE lending rates
@@ -107,20 +207,48 @@ async function getMemberAllocation() {
   return [];
 }
 
-// Deposit amount (in ether) to vault contract
+// Deposit amount to vault using TVC backend API
 async function depositToVault(amountEther) {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return false;
-  }
   try {
-    // Simulate deposit for demo purposes
-    console.log(`Depositing ${amountEther} to vault...`);
-    alert(`Demo mode: Automated deposit of ${amountEther} successful!`);
-    return true;
+    const API_BASE_URL = 'https://your-supabase-url.supabase.co/functions/v1';
+    const VAULT_CLUB_API_KEY = 'your-vault-club-api-key';
+    const token = localStorage.getItem('vault_access_token');
+    
+    if (!token) {
+      alert("Please connect your wallet first.");
+      return false;
+    }
+    
+    // Convert amount to USDC (assuming 1:1 for demo)
+    const amountUSDC = parseFloat(amountEther);
+    
+    // Generate mock transaction hash for demo
+    const txHash = '0x' + Math.random().toString(16).substr(2, 64);
+    
+    const response = await fetch(`${API_BASE_URL}/vault-operations/deposit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-vault-club-api-key': VAULT_CLUB_API_KEY,
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        amount: amountUSDC,
+        token: 'USDC',
+        transaction_hash: txHash
+      })
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      alert(`Deposit successful! Amount: $${amountUSDC}\nTransaction: ${data.data.transaction_hash}`);
+      return true;
+    } else {
+      throw new Error(data.error || 'Deposit failed');
+    }
   } catch (error) {
     console.error("Deposit failed:", error);
-    alert("Deposit transaction failed.");
+    alert(`Deposit failed: ${error.message}`);
     return false;
   }
 }

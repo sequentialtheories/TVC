@@ -34,14 +34,16 @@ All critical issues identified by the user have been addressed. Contract verific
   - Heavy: $100-400/week scaling by contract age
 - **Calculation Logic**: Lines 1065-1104 with proper year-based scaling
 
-### 4. Contract Verification - ATTEMPTED (4 TIMES)
-- **Status**: ❌ FAILED (API Key Issues)
+### 4. Contract Verification - ATTEMPTED (5 TIMES)
+- **Status**: ❌ FAILED (Network Configuration Issues)
 - **Attempts**:
   1. Original Polygonscan API key: Failed
   2. Retry with same key: Failed  
   3. New Etherscan V2 API key: Failed
   4. Final retry: Failed
-- **Error**: "Invalid API Key (#err2)|POLYTestNet"
+  5. Latest attempt with provided API key: Failed
+- **Error**: "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain"
+- **Root Cause**: Contracts deployed to local hardhat network (chain id 31337) instead of Amoy testnet
 - **Decision**: Documented and moved on per user instructions
 
 ## 🔧 Additional Fixes Applied

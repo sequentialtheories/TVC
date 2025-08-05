@@ -395,9 +395,10 @@ async function authenticateWithST() {
   try {
     const stToken = localStorage.getItem('st_token');
     if (stToken) {
-      const response = await fetch('https://api.sequencetheory.com/auth/verify', {
+      const response = await fetch('https://qldjhlnsphlixmzzrdwi.supabase.co/functions/v1/external-api/user-wallets', {
         headers: {
-          'Authorization': `Bearer ${stToken}`
+          'Authorization': `Bearer ${stToken}`,
+          'Content-Type': 'application/json'
         }
       });
       
@@ -407,8 +408,39 @@ async function authenticateWithST() {
       }
     }
     
-    const redirectUrl = encodeURIComponent(window.location.origin);
-    window.location.href = `https://sequencetheoryinc.com/auth?client_id=vault-club-client&redirect_uri=${redirectUrl}`;
+    // Try to get a new API key
+    try {
+      const keyResponse = await fetch('https://qldjhlnsphlixmzzrdwi.supabase.co/functions/v1/create-test-api-key', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (keyResponse.ok) {
+        const keyData = await keyResponse.json();
+        if (keyData.api_key) {
+          localStorage.setItem('st_token', keyData.api_key);
+          
+          // Try authentication again with new key
+          const authResponse = await fetch('https://qldjhlnsphlixmzzrdwi.supabase.co/functions/v1/external-api/user-wallets', {
+            headers: {
+              'Authorization': `Bearer ${keyData.api_key}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (authResponse.ok) {
+            const userData = await authResponse.json();
+            return userData;
+          }
+        }
+      }
+    } catch (keyError) {
+      console.error('Failed to generate API key:', keyError);
+    }
+    
+    return null;
   } catch (error) {
     console.error('ST authentication failed:', error);
     return null;
@@ -426,6 +458,7 @@ const VaultClubWebsite = () => {
   const [depositAmount, setDepositAmount] = useState('');
   
   // Club creation states
+  const [isCreatingClub, setIsCreatingClub] = useState(false);
   const [clubCreationData, setClubCreationData] = useState({
     lockupPeriod: 5,
     rigorLevel: 'medium',
@@ -666,7 +699,9 @@ const VaultClubWebsite = () => {
 
   useEffect(() => {
     const initializeWallet = async () => {
-      if (window.ethereum) {
+      const wasConnected = localStorage.getItem('walletConnected') === 'true';
+      
+      if (window.ethereum && wasConnected) {
         try {
           const accounts = await window.ethereum.request({ method: 'eth_accounts' });
           if (accounts.length > 0) {
@@ -674,23 +709,36 @@ const VaultClubWebsite = () => {
             setWalletAddress(accounts[0]);
             const balance = await getVaultBalance(accounts[0]);
             setVaultBalance(balance);
+            localStorage.setItem('walletConnected', 'true');
+            localStorage.setItem('walletAddress', accounts[0]);
+          } else {
+            localStorage.removeItem('walletConnected');
+            localStorage.removeItem('walletAddress');
           }
-          
-          window.ethereum.on('accountsChanged', async (accounts) => {
-            if (accounts.length === 0) {
-              setWalletConnected(false);
-              setWalletAddress(null);
-              setVaultBalance("0");
-            } else {
-              setWalletConnected(true);
-              setWalletAddress(accounts[0]);
-              const balance = await getVaultBalance(accounts[0]);
-              setVaultBalance(balance);
-            }
-          });
         } catch (error) {
           console.error("Error initializing wallet:", error);
+          localStorage.removeItem('walletConnected');
+          localStorage.removeItem('walletAddress');
         }
+      }
+      
+      if (window.ethereum) {
+        window.ethereum.on('accountsChanged', async (accounts) => {
+          if (accounts.length === 0) {
+            setWalletConnected(false);
+            setWalletAddress(null);
+            setVaultBalance("0");
+            localStorage.removeItem('walletConnected');
+            localStorage.removeItem('walletAddress');
+          } else {
+            setWalletConnected(true);
+            setWalletAddress(accounts[0]);
+            const balance = await getVaultBalance(accounts[0]);
+            setVaultBalance(balance);
+            localStorage.setItem('walletConnected', 'true');
+            localStorage.setItem('walletAddress', accounts[0]);
+          }
+        });
       }
     };
     initializeWallet();
@@ -995,23 +1043,32 @@ const VaultClubWebsite = () => {
   };
 
   const handleConnectWallet = async () => {
-    // Try Sequence Theory authentication first
-    const stUser = await authenticateWithST();
-    if (stUser && stUser.wallet) {
-      setWalletConnected(true);
-      setWalletAddress(stUser.wallet);
-      const balance = await getVaultBalance(stUser.wallet);
-      setVaultBalance(balance);
-      return;
-    }
-    
-    // Fallback to MetaMask
-    const address = await connectWallet();
-    if (address) {
-      setWalletConnected(true);
-      setWalletAddress(address);
-      const balance = await getVaultBalance(address);
-      setVaultBalance(balance);
+    try {
+      // Try Sequence Theory authentication first
+      const stUser = await authenticateWithST();
+      if (stUser && stUser.wallet) {
+        setWalletConnected(true);
+        setWalletAddress(stUser.wallet);
+        const balance = await getVaultBalance(stUser.wallet);
+        setVaultBalance(balance);
+        localStorage.setItem('walletConnected', 'true');
+        localStorage.setItem('walletAddress', stUser.wallet);
+        return;
+      }
+
+      // Fallback to MetaMask
+      const address = await connectWallet();
+      if (address) {
+        setWalletConnected(true);
+        setWalletAddress(address);
+        const balance = await getVaultBalance(address);
+        setVaultBalance(balance);
+        localStorage.setItem('walletConnected', 'true');
+        localStorage.setItem('walletAddress', address);
+      }
+    } catch (error) {
+      console.error("Error connecting wallet:", error);
+      alert("Failed to connect wallet. Please try again.");
     }
   };
 
@@ -1226,10 +1283,12 @@ const VaultClubWebsite = () => {
 
   const handleCreateClub = async () => {
     if (!walletConnected) {
-      alert("Please connect your wallet first");
+      alert("Please connect your wallet first to create a subclub");
       return;
     }
-    
+
+    setIsCreatingClub(true);
+
     // Create SubClub using factory contract
     let contractAddress;
     try {
@@ -1240,20 +1299,48 @@ const VaultClubWebsite = () => {
       const rigorLevelMap = { "light": 0, "medium": 1, "heavy": 2 };
       const rigorLevel = rigorLevelMap[clubCreationData.rigorLevel.toLowerCase()] || 0;
       
+      console.log("Creating subclub with parameters:", {
+        members: [walletAddress],
+        lockupPeriod: parseInt(clubCreationData.lockupPeriod) * (clubCreationData.isChargedContract ? 30 : 365) * 24 * 60 * 60,
+        rigorLevel
+      });
+
       const tx = await factoryContract.createSubClub(
         [walletAddress],
         parseInt(clubCreationData.lockupPeriod) * (clubCreationData.isChargedContract ? 30 : 365) * 24 * 60 * 60,
         rigorLevel
       );
       
+      console.log("Transaction submitted:", tx.hash);
       const receipt = await tx.wait();
+      console.log("Transaction confirmed:", receipt);
+      
       const subClubCreatedEvent = receipt.events?.find(e => e.event === 'SubClubCreated');
       contractAddress = subClubCreatedEvent?.args?.subClub || receipt.contractAddress;
+      
+      if (!contractAddress) {
+        throw new Error("SubClub creation event not found in transaction receipt");
+      }
       
       console.log("SubClub created successfully:", contractAddress);
     } catch (error) {
       console.error("Error creating SubClub:", error);
-      alert("SubClub creation failed: " + error.message + ". Please try again.");
+      
+      let errorMessage = "SubClub creation failed: ";
+      if (error.code === 4001) {
+        errorMessage += "Transaction was rejected by user.";
+      } else if (error.code === -32603) {
+        errorMessage += "Internal JSON-RPC error. Please check your wallet balance and network connection.";
+      } else if (error.message?.includes("insufficient funds")) {
+        errorMessage += "Insufficient funds for gas fees.";
+      } else if (error.message?.includes("user rejected")) {
+        errorMessage += "Transaction was rejected.";
+      } else {
+        errorMessage += error.message + ". Please check your wallet connection and try again.";
+      }
+      
+      alert(errorMessage);
+      setIsCreatingClub(false);
       return;
     }
     
@@ -1312,6 +1399,7 @@ Utility Fee: ${clubCreationData.isChargedContract ? '$1.25' : '$1.00'}/user/week
 Your subclub is now live and ready for members to join!`);
     
     setActiveModal(null);
+    setIsCreatingClub(false);
   };
 
   const CreateClubModal = () => {    
@@ -1607,9 +1695,14 @@ Your subclub is now live and ready for members to join!`);
             <div className="pt-6 border-t">
               <button 
                 onClick={handleCreateClub}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-lg font-medium text-lg transition-colors"
+                disabled={isCreatingClub}
+                className={`w-full py-4 rounded-lg font-medium text-lg transition-colors ${
+                  isCreatingClub 
+                    ? 'bg-gray-400 cursor-not-allowed text-gray-200' 
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
               >
-                Deploy Subclub Contract
+                {isCreatingClub ? 'Creating Contract...' : 'Deploy Subclub Contract'}
               </button>
             </div>
             </div>

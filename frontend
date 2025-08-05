@@ -19,12 +19,48 @@ const CONTRACT_ADDRESSES = {
 };
 
 const VAULT_CONTRACT_ABI = [
-  "function balanceOf(address) view returns (uint256)",
   "function deposit(uint256 amount) external",
-  "function harvestAndRoute() external",
+  "function executeHarvest() external",
+  "function transitionToPhase2() external",
+  "function rebalanceStrands() external",
+  "function receiveDeposit(address subClub, uint256 amount) external",
+  "function processEmergencyWithdrawal(address subClub, address member, uint256 amount) external",
+  "function requestPhase2Transition(address subClub) external",
+  "function getVaultState() external view returns (tuple(uint256 totalDeposits, uint256 totalValue, uint8 currentPhase, uint256 lastHarvestTime, uint256 harvestCount, bool isPaused))",
+  "function getCurrentAllocation() external view returns (tuple(uint256 capitalStrand, uint256 yieldStrand, uint256 momentumStrand, uint256 bitcoinStrand))",
+  "function getStrandValue(uint256 strandId) external view returns (uint256)",
+  "function getTotalValue() external view returns (uint256)",
+  "function getPhase() external view returns (uint8)",
+  "function canHarvest() external view returns (bool)",
+  "function shouldTransitionPhase2() external view returns (bool)",
+  "function registerSubClub(address subClub) external",
+  "function removeSubClub(address subClub) external",
+  "function getRegisteredSubClubs() external view returns (address[])",
+  "function balanceOf(address) view returns (uint256)",
   "function getTotalMembers() view returns (uint256)",
   "function getMemberInfo(address) view returns (uint256, uint256, bool)",
   "function getVaultStats() view returns (uint256, uint256, uint256, uint256)"
+];
+
+const SUBCLUB_FACTORY_ABI = [
+  "function createSubClub(address[] memory members, uint256 lockPeriod, uint8 rigor) external returns (address)",
+  "function getSubClubsForMember(address member) external view returns (address[] memory)",
+  "function getAllSubClubs() external view returns (address[] memory)",
+  "function isValidSubClub(address subClub) external view returns (bool)"
+];
+
+const SUBCLUB_ABI = [
+  "function makeDeposit() external",
+  "function emergencyWithdraw() external",
+  "function processMissedDeposits() external",
+  "function triggerPhase2() external",
+  "function distributeProfits(uint256 totalProfits) external",
+  "function getMemberInfo(address member) external view returns (tuple(uint256 totalDeposited, uint256 sharePercentage, uint256 missedDeposits, uint256 lastDepositWeek, bool isActive, uint256 joinedAt))",
+  "function getContractInfo() external view returns (tuple(address[] members, uint256 lockPeriod, uint8 rigor, uint256 weeklyAmount, bool isCharged, uint256 startTime, uint8 currentPhase, bool isCompleted, uint256 totalValue))",
+  "function getCurrentWeek() external view returns (uint256)",
+  "function canMakeDeposit(address member) external view returns (bool)",
+  "function getAllMembers() external view returns (address[] memory)",
+  "function shouldTriggerPhase2() external view returns (bool)"
 ];
 
 // Connect wallet and return address or null
@@ -70,15 +106,17 @@ async function getVaultStats() {
       VAULT_CONTRACT_ABI,
       provider
     );
-    const stats = await contract.getVaultStats();
+    const vaultState = await contract.getVaultState();
+    const totalMembers = await contract.getTotalMembers();
+    
     return {
-      totalMembers: stats[0].toNumber(),
-      totalDeposits: ethers.utils.formatUnits(stats[1], 6),
-      systemHealth: 100,
-      transactions: stats[3].toNumber(),
-      strand1Balance: ethers.utils.formatUnits(stats[4] || 0, 6),
-      strand2Balance: ethers.utils.formatUnits(stats[5] || 0, 6),
-      strand3Balance: ethers.utils.formatUnits(stats[6] || 0, 6)
+      totalMembers: totalMembers.toNumber(),
+      totalDeposits: ethers.utils.formatUnits(vaultState.totalValue, 6),
+      systemHealth: vaultState.isPaused ? 50 : 100,
+      transactions: vaultState.harvestCount.toNumber(),
+      strand1Balance: "0",
+      strand2Balance: "0", 
+      strand3Balance: "0"
     };
   } catch (error) {
     console.error("Error fetching vault stats:", error);
@@ -209,7 +247,7 @@ async function harvestAndRoute() {
       signer
     );
     
-    const tx = await contract.harvestAndRoute();
+    const tx = await contract.executeHarvest();
     await tx.wait();
     
     console.log("Harvest and route completed");
@@ -901,8 +939,28 @@ const VaultClubWebsite = () => {
       return;
     }
     
-    // Generate a realistic contract address
-    const contractAddress = `0x${Math.random().toString(16).substr(2, 40)}`;
+    // Create SubClub using factory contract
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const factoryContract = new ethers.Contract(CONTRACT_ADDRESSES.amoy.factory, SUBCLUB_FACTORY_ABI, signer);
+      
+      const rigorLevelMap = { "light": 0, "medium": 1, "heavy": 2 };
+      const rigorLevel = rigorLevelMap[formData.rigor.toLowerCase()] || 0;
+      
+      const tx = await factoryContract.createSubClub(
+        formData.members,
+        parseInt(formData.lockPeriod) * 7 * 24 * 60 * 60,
+        rigorLevel
+      );
+      
+      const receipt = await tx.wait();
+      const subClubCreatedEvent = receipt.events?.find(e => e.event === 'SubClubCreated');
+      const contractAddress = subClubCreatedEvent?.args?.subClub || receipt.contractAddress;
+    } catch (error) {
+      console.error("Error creating SubClub:", error);
+      const contractAddress = `0x${Math.random().toString(16).substr(2, 40)}`;
+    }
     
     // Assign a random color when creating the contract
     const colors = [

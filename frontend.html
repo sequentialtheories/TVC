@@ -463,7 +463,62 @@ const VaultClubWebsite = () => {
             alert('ℹ️ You are already a member of this contract.');
           }
         } else {
-          alert('❌ Contract not found. The link may be invalid or the contract may not be deployed yet.');
+          // Contract not in local state - try to fetch from blockchain
+          const handleExternalContract = async () => {
+            try {
+              const provider = new ethers.providers.Web3Provider(window.ethereum);
+              const factoryContract = new ethers.Contract(CONTRACT_ADDRESSES.amoy.factory, SUBCLUB_FACTORY_ABI, provider);
+              
+              // Check if contract is valid SubClub
+              const isValid = await factoryContract.isValidSubClub(joinContractId);
+              
+              if (isValid) {
+                // Get contract info from SubClub contract
+                const subClubContract = new ethers.Contract(joinContractId, SUBCLUB_ABI, provider);
+                const contractInfo = await subClubContract.getContractInfo();
+                const members = await subClubContract.getAllMembers();
+                
+                // Check if user is already a member
+                if (members.includes(walletAddress)) {
+                  alert('ℹ️ You are already a member of this contract.');
+                } else if (members.length >= 4) { // Assuming max 4 members
+                  alert('❌ This contract is full. No more members can join.');
+                } else {
+                  // Create contract object and add to local state
+                  const newContract = {
+                    id: Date.now(),
+                    contractAddress: joinContractId,
+                    creator: members[0], // First member is creator
+                    maxMembers: 4,
+                    lockupPeriod: Math.floor(contractInfo.lockPeriod / (365 * 24 * 60 * 60)), // Convert seconds to years
+                    rigorLevel: ['light', 'medium', 'heavy'][contractInfo.rigor] || 'light',
+                    isPrivate: false, // Assume public if shareable
+                    isChargedContract: contractInfo.isCharged,
+                    currentMembers: members.length + 1,
+                    createdAt: new Date(contractInfo.startTime * 1000).toISOString(),
+                    status: 'active',
+                    totalDeposits: ethers.utils.formatUnits(contractInfo.totalValue, 6),
+                    members: [...members, walletAddress],
+                    borderColor: 'border-blue-500',
+                    strand1Balance: "0",
+                    strand2Balance: "0",
+                    strand3Balance: "0"
+                  };
+                  
+                  setDeployedSubclubs(prev => [...prev, newContract]);
+                  
+                  alert(`✅ Successfully joined external subclub contract!\n\n${newContract.lockupPeriod} ${newContract.isChargedContract ? 'Month' : 'Year'} Lockup • ${newContract.rigorLevel.charAt(0).toUpperCase() + newContract.rigorLevel.slice(1)} Rigor\n\nYou can now start making deposits according to the contract schedule.`);
+                }
+              } else {
+                alert('❌ Invalid contract address or contract not found.');
+              }
+            } catch (error) {
+              console.error('Error fetching external contract:', error);
+              alert('❌ Unable to join contract. Please check the contract address and try again.');
+            }
+          };
+          
+          handleExternalContract();
         }
         
         // Clean up URL
@@ -1077,26 +1132,30 @@ const VaultClubWebsite = () => {
     }
     
     // Create SubClub using factory contract
+    let contractAddress;
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const factoryContract = new ethers.Contract(CONTRACT_ADDRESSES.amoy.factory, SUBCLUB_FACTORY_ABI, signer);
       
       const rigorLevelMap = { "light": 0, "medium": 1, "heavy": 2 };
-      const rigorLevel = rigorLevelMap[formData.rigor.toLowerCase()] || 0;
+      const rigorLevel = rigorLevelMap[clubCreationData.rigorLevel.toLowerCase()] || 0;
       
       const tx = await factoryContract.createSubClub(
-        formData.members,
-        parseInt(formData.lockPeriod) * 7 * 24 * 60 * 60,
+        [walletAddress],
+        parseInt(clubCreationData.lockupPeriod) * (clubCreationData.isChargedContract ? 30 : 365) * 24 * 60 * 60,
         rigorLevel
       );
       
       const receipt = await tx.wait();
       const subClubCreatedEvent = receipt.events?.find(e => e.event === 'SubClubCreated');
-      const contractAddress = subClubCreatedEvent?.args?.subClub || receipt.contractAddress;
+      contractAddress = subClubCreatedEvent?.args?.subClub || receipt.contractAddress;
+      
+      console.log("SubClub created successfully:", contractAddress);
     } catch (error) {
       console.error("Error creating SubClub:", error);
-      const contractAddress = `0x${Math.random().toString(16).substr(2, 40)}`;
+      alert("SubClub creation failed: " + error.message + ". Please try again.");
+      return;
     }
     
     // Assign a random color when creating the contract

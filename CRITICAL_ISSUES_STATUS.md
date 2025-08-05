@@ -95,3 +95,5 @@ All critical issues identified by the user have been addressed. Contract verific
 - System is ready for comprehensive testing with real AMOY tokens
 - Contract verification issues are API-related, not code-related
 - Frontend is fully functional and accessible via public URL
+- "Create New Subclub" button is now properly disabled when wallet is not connected
+- TVC API server has been implemented for Sequence Theory integration

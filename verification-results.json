@@ -3,51 +3,51 @@
   "failed": [
     {
       "name": "MockAavePool",
-      "error": "Invalid API Key (#err2)|POLYTestNet"
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
     },
     {
       "name": "MockQuickSwapRouter",
-      "error": "Invalid API Key (#err2)|POLYTestNet"
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
     },
     {
       "name": "MockWBTC",
-      "error": "Too many invalid api key attempts, please try again later"
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
     },
     {
       "name": "EmergencyModule",
-      "error": "Invalid API Key (#err2)|POLYTestNet"
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
     },
     {
       "name": "MegaVaultFactory",
-      "error": "Invalid API Key (#err2)|POLYTestNet"
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
     },
     {
       "name": "StrandManagerCapital",
-      "error": "Invalid API Key (#err2)|POLYTestNet"
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
     },
     {
       "name": "StrandManagerYield",
-      "error": "Too many invalid api key attempts, please try again later"
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
     },
     {
       "name": "StrandManagerMomentum",
-      "error": "Invalid API Key (#err2)|POLYTestNet"
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
     },
     {
       "name": "RRLEngine",
-      "error": "Invalid API Key (#err2)|POLYTestNet"
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
     },
     {
       "name": "BTCAccumulator",
-      "error": "Too many invalid api key attempts, please try again later"
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
     },
     {
       "name": "SubscriptionLender",
-      "error": "Too many invalid api key attempts, please try again later"
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
     },
     {
       "name": "MegaVault",
-      "error": "Invalid API Key (#err2)|POLYTestNet"
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
     }
   ]
 }

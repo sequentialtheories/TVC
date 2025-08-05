@@ -1,5 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import { Database, Settings, User, Users, TrendingUp, Info, X, Bitcoin, DollarSign, Zap, Shield, ArrowLeft, Wallet, Home, Share2, MessageSquare, Heart, Reply, Plus, Filter, Search } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Vault Club - TVC</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+const { useState, useEffect } = React;
+// Simple icon placeholders for now to get the app working
+const Database = () => React.createElement('span', {}, '📊');
+const Settings = () => React.createElement('span', {}, '⚙️');
+const User = () => React.createElement('span', {}, '👤');
+const Users = () => React.createElement('span', {}, '👥');
+const TrendingUp = () => React.createElement('span', {}, '📈');
+const Info = () => React.createElement('span', {}, 'ℹ️');
+const X = () => React.createElement('span', {}, '✕');
+const Bitcoin = () => React.createElement('span', {}, '₿');
+const DollarSign = () => React.createElement('span', {}, '$');
+const Zap = () => React.createElement('span', {}, '⚡');
+const Shield = () => React.createElement('span', {}, '🛡️');
+const ArrowLeft = () => React.createElement('span', {}, '←');
+const Wallet = () => React.createElement('span', {}, '💰');
+const Home = () => React.createElement('span', {}, '🏠');
+const Share2 = () => React.createElement('span', {}, '📤');
+const MessageSquare = () => React.createElement('span', {}, '💬');
+const Heart = () => React.createElement('span', {}, '❤️');
+const Reply = () => React.createElement('span', {}, '↩️');
+const Plus = () => React.createElement('span', {}, '+');
+const Filter = () => React.createElement('span', {}, '🔍');
+const Search = () => React.createElement('span', {}, '🔎');
 
 const CONTRACT_ADDRESSES = {
   amoy: {
@@ -3510,4 +3547,9 @@ Your subclub is now live and ready for members to join!`);
   );
 };
 
-export default VaultClubWebsite;
+// Use React 18 createRoot API
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<VaultClubWebsite />);
+    </script>
+</body>
+</html>

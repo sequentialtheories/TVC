@@ -55,10 +55,23 @@
 
 ## 🚀 Next Steps
 
-1. **7-Day Testnet Validation Period** - Monitor contract performance
-2. **Contract Verification** - Verify on Polygonscan (pending API key)
+1. **Contract Verification** - ⚠️ BLOCKED: API key rate limited after multiple attempts
+2. **7-Day Testnet Validation Period** - ⏳ WAITING: Requires additional AMOY funding (0.05 → 0.15 needed)
 3. **Security Audit** - Prepare for CertiK audit
 4. **Mainnet Deployment** - After successful testnet validation
+
+## ⚠️ Current Blockers
+
+**Contract Verification Status:** FAILED
+- API Key: `KBRS82KPCBAWVFTT69MEKQAKKHFUFHEMGM` (Etherscan v2)
+- Error: "Invalid API Key (#err2)|POLYTestNet" and "Too many invalid api key attempts"
+- Attempts: Multiple verification attempts failed
+- Recommendation: Wait 24+ hours for rate limit reset, then retry
+
+**Testnet Validation Status:** WAITING
+- Current Balance: 0.05 AMOY tokens
+- Required Balance: ~0.15 AMOY tokens
+- Wallet: `0x190E7BA62a220Ba9B926345cD33Cdcbc25c3e693`
 
 ## 🔍 For Future AI Sessions
 

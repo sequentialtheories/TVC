@@ -1,9 +1,7 @@
 {
-  "passed": [
-    "SubClub creation",
-    "MegaVault integration",
-    "Emergency module"
+  "passed": [],
+  "failed": [
+    "insufficient funds for intrinsic transaction cost [ See: https://links.ethers.org/v5-errors-INSUFFICIENT_FUNDS ] (error={\"name\":\"ProviderError\",\"_stack\":\"ProviderError: insufficient funds for gas * price + value: balance 50000000000000000, tx cost 150835920000000000, overshot 100835920000000000\\n    at HttpProvider.request (/home/ubuntu/repos/TVC/node_modules/hardhat/src/internal/core/providers/http.ts:116:21)\\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\\n    at EthersProviderWrapper.send (/home/ubuntu/repos/TVC/node_modules/@nomiclabs/hardhat-ethers/src/internal/ethers-provider-wrapper.ts:13:20)\",\"code\":-32000,\"_isProviderError\":true}, method=\"sendTransaction\", transaction=undefined, code=INSUFFICIENT_FUNDS, version=providers/5.8.0)"
   ],
-  "failed": [],
   "warnings": []
 }

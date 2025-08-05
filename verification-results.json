@@ -43,7 +43,7 @@
     },
     {
       "name": "SubscriptionLender",
-      "error": "Invalid API Key (#err2)|POLYTestNet"
+      "error": "Too many invalid api key attempts, please try again later"
     },
     {
       "name": "MegaVault",

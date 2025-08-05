@@ -1,0 +1,43 @@
+{
+  "name": "tvc",
+  "version": "1.0.0",
+  "description": "TVC (The Vault Club) - DeFi investment platform with 8 core smart contracts deployed to Amoy testnet",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx hardhat test",
+    "test:coverage": "npx hardhat coverage",
+    "compile": "npx hardhat compile",
+    "size": "npx hardhat size-contracts",
+    "deploy:amoy": "npx hardhat run scripts/deployment/deploy-testnet.js --network amoy",
+    "deploy:mvp": "npx hardhat run scripts/deployment/deploy-mvp.js --network amoy",
+    "deploy:batch1": "BATCH_TYPE=batch1 npx hardhat run scripts/deployment/deploy-batch.js --network amoy",
+    "deploy:batch2": "BATCH_TYPE=batch2 npx hardhat run scripts/deployment/deploy-batch.js --network amoy",
+    "deploy:batch3": "BATCH_TYPE=batch3 npx hardhat run scripts/deployment/deploy-batch.js --network amoy",
+    "deploy:full": "npm run deploy:batch1 && npm run deploy:batch2 && npm run deploy:batch3",
+    "validate:testnet": "npx hardhat run scripts/verification/test-testnet.js --network amoy",
+    "check:protocols": "npx hardhat run scripts/utils/check-external-protocols.js --network amoy"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@aave/core-v3": "^1.19.2",
+    "@chainlink/contracts": "^0.8.0",
+    "@nomiclabs/hardhat-ethers": "^2.2.3",
+    "@nomiclabs/hardhat-etherscan": "^3.1.7",
+    "@nomiclabs/hardhat-waffle": "^2.0.6",
+    "@openzeppelin/contracts": "^4.9.0",
+    "@types/chai": "^4.3.11",
+    "@types/mocha": "^10.0.6",
+    "@types/sinon-chai": "^3.2.12",
+    "@uniswap/v2-periphery": "^1.1.0-beta.0",
+    "chai": "^4.3.10",
+    "dotenv": "^17.2.1",
+    "ethereum-waffle": "^4.0.10",
+    "ethers": "^5.8.0",
+    "hardhat": "^2.26.1",
+    "hardhat-contract-sizer": "^2.10.0",
+    "hardhat-gas-reporter": "^1.0.9",
+    "solidity-coverage": "^0.8.5"
+  }
+}

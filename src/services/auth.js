@@ -7,20 +7,42 @@ class AuthService {
     this.stWalletRegistry = process.env.REACT_APP_ST_WALLET_REGISTRY || 'https://api.sequencetheory.com/wallet-map'
   }
 
-  async authenticateWithST(credentials) {
+  async login(credentials) {
     try {
-      const stToken = await this.loginToST(credentials)
-      const vaultSession = await this.exchangeTokenWithVault(stToken)
-      const wallet = await this.getWalletFromST(vaultSession)
+      const stResponse = await fetch(`${this.stAuthEndpoint}/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      });
+
+      const stData = await stResponse.json();
       
-      return {
-        session: vaultSession,
-        wallet: wallet,
-        stToken: stToken
+      if (!stData.success) {
+        throw new Error(stData.error || 'ST login failed');
+      }
+
+      const vaultResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002/api'}/auth/exchange-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ stToken: stData.token }),
+      });
+
+      const vaultData = await vaultResponse.json();
+      
+      if (vaultData.success) {
+        localStorage.setItem('authToken', vaultData.data.token);
+        localStorage.setItem('user', JSON.stringify(vaultData.data.user));
+        return vaultData.data;
+      } else {
+        throw new Error(vaultData.error || 'Vault login failed');
       }
     } catch (error) {
-      console.error('ST Authentication failed:', error)
-      throw new Error('Authentication with Sequence Theory failed')
+      console.error('Login error:', error);
+      throw error;
     }
   }
 
@@ -63,11 +85,33 @@ class AuthService {
 
   async refreshSession() {
     try {
-      const response = await apiService.refreshToken()
-      return response.token
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('No auth token found');
+      }
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3002/api'}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        localStorage.setItem('authToken', data.data.token);
+        localStorage.setItem('user', JSON.stringify(data.data.user));
+        return data.data;
+      } else {
+        this.logout();
+        throw new Error(data.error || 'Session refresh failed');
+      }
     } catch (error) {
-      console.error('Session refresh failed:', error)
-      throw new Error('Failed to refresh session')
+      console.error('Session refresh error:', error);
+      this.logout();
+      throw error;
     }
   }
 

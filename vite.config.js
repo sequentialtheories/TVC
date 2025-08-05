@@ -15,5 +15,12 @@ export default defineConfig({
     alias: {
       '@': '/src'
     }
+  },
+  define: {
+    global: 'globalThis',
+    'process.env': {}
+  },
+  optimizeDeps: {
+    include: ['ethers']
   }
 })

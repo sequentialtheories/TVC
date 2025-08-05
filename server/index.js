@@ -2,11 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const { logger, logRequest, logError } = require('./utils/logger');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const walletRoutes = require('./routes/wallets');
+const vaultRoutes = require('./routes/vault');
+const emergencyRoutes = require('./routes/emergency');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -20,21 +23,40 @@ const limiter = rateLimit({
 app.use(helmet());
 app.use(limiter);
 app.use(cors({
-  origin: ['http://localhost:8000', 'http://127.0.0.1:8000'],
+  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:8000', 'http://127.0.0.1:8000'],
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(logRequest);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/wallets', walletRoutes);
+app.use('/api/vault', vaultRoutes);
+app.use('/api/emergency', emergencyRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ 
-    status: 'healthy', 
+    status: 'healthy',
     timestamp: new Date().toISOString(),
-    service: 'vault-club-api'
+    service: 'vault-club-api',
+    version: '1.0'
+  });
+});
+
+app.get('/api/metrics', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      timestamp: new Date().toISOString(),
+      nodeVersion: process.version
+    },
+    error: null,
+    timestamp: new Date().toISOString(),
+    version: '1.0'
   });
 });
 

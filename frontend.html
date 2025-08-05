@@ -274,6 +274,16 @@ async function getMemberAllocation() {
   }
 }
 
+// Convert AMOY to USD for testing (0.01 AMOY = $1 USD)
+const convertAmoyToUSD = (amoyAmount) => {
+  return amoyAmount * 100; // 0.01 AMOY = $1 USD
+};
+
+// Convert USD to AMOY for testing (inverse of above)
+const convertUSDToAmoy = (usdAmount) => {
+  return usdAmount / 100; // $1 USD = 0.01 AMOY
+};
+
 async function depositToVault(amountUSDC) {
   if (!window.ethereum) {
     alert("MetaMask is required to use this app.");
@@ -422,12 +432,12 @@ const VaultClubWebsite = () => {
     maxMembers: 1,
     isPrivate: false,
     isChargedContract: false,
-    customWeeklyAmount: 75,
+    customWeeklyAmount: convertUSDToAmoy(75),
     customSchedule: [
-      { yearStart: 1, yearEnd: 3, amount: 75 },
-      { yearStart: 4, yearEnd: 6, amount: 100 },
-      { yearStart: 7, yearEnd: 10, amount: 150 },
-      { yearStart: 11, yearEnd: 20, amount: 200 }
+      { yearStart: 1, yearEnd: 3, amount: convertUSDToAmoy(75) },
+      { yearStart: 4, yearEnd: 6, amount: convertUSDToAmoy(100) },
+      { yearStart: 7, yearEnd: 10, amount: convertUSDToAmoy(150) },
+      { yearStart: 11, yearEnd: 20, amount: convertUSDToAmoy(200) }
     ]
   });
   
@@ -491,7 +501,7 @@ const VaultClubWebsite = () => {
   const [selectedContract, setSelectedContract] = useState(null);
   const [simulationYears, setSimulationYears] = useState(15);
   const [simulationRigor, setSimulationRigor] = useState('heavy');
-  const [customSimulationAmount, setCustomSimulationAmount] = useState(75);
+  const [customSimulationAmount, setCustomSimulationAmount] = useState(convertUSDToAmoy(75));
   const [chartData, setChartData] = useState([]);
   
   // Subclub management
@@ -706,8 +716,8 @@ const VaultClubWebsite = () => {
       weeklyTotal: 0.575
     };
     
-    // Utility fee: $1/week/user
-    const utilityFeePerWeek = (vaultStats.totalMembers || 1) * 1;
+    // Utility fee: $1/week/user (converted to AMOY)
+    const utilityFeePerWeek = (vaultStats.totalMembers || 1) * convertUSDToAmoy(1);
 
     for (let week = 0; week <= totalWeeks; week++) {
       const year = Math.floor(week / weeksPerYear) + 1;
@@ -720,23 +730,23 @@ const VaultClubWebsite = () => {
       let weeklyDeposit;
       
       if (simulationRigor === 'light') {
-        // Light rigor: monthly deposits converted to weekly
-        if (year <= 1) weeklyDeposit = 100 / 4.33;       // $100/month
-        else if (year <= 2) weeklyDeposit = 150 / 4.33;  // $150/month
-        else if (year <= 3) weeklyDeposit = 200 / 4.33;  // $200/month
-        else weeklyDeposit = 250 / 4.33;                 // $250/month
+        // Light rigor: monthly deposits converted to weekly (converted to AMOY)
+        if (year <= 1) weeklyDeposit = convertUSDToAmoy(100 / 4.33);       // $100/month
+        else if (year <= 2) weeklyDeposit = convertUSDToAmoy(150 / 4.33);  // $150/month
+        else if (year <= 3) weeklyDeposit = convertUSDToAmoy(200 / 4.33);  // $200/month
+        else weeklyDeposit = convertUSDToAmoy(250 / 4.33);                 // $250/month
       } else if (simulationRigor === 'medium') {
-        // Medium rigor deposit schedule
-        if (year <= 3) weeklyDeposit = 50;
-        else if (year <= 6) weeklyDeposit = 100;
-        else if (year <= 10) weeklyDeposit = 200;
-        else weeklyDeposit = 250;
+        // Medium rigor deposit schedule (converted to AMOY)
+        if (year <= 3) weeklyDeposit = convertUSDToAmoy(50);
+        else if (year <= 6) weeklyDeposit = convertUSDToAmoy(100);
+        else if (year <= 10) weeklyDeposit = convertUSDToAmoy(200);
+        else weeklyDeposit = convertUSDToAmoy(250);
       } else if (simulationRigor === 'heavy') {
-        // Heavy rigor deposit schedule
-        if (year <= 3) weeklyDeposit = 100;
-        else if (year <= 6) weeklyDeposit = 200;
-        else if (year <= 10) weeklyDeposit = 300;
-        else weeklyDeposit = 400;
+        // Heavy rigor deposit schedule (converted to AMOY)
+        if (year <= 3) weeklyDeposit = convertUSDToAmoy(100);
+        else if (year <= 6) weeklyDeposit = convertUSDToAmoy(200);
+        else if (year <= 10) weeklyDeposit = convertUSDToAmoy(300);
+        else weeklyDeposit = convertUSDToAmoy(400);
       } else {
         // Custom rigor - use user-defined amount
         weeklyDeposit = customSimulationAmount;
@@ -878,11 +888,11 @@ const VaultClubWebsite = () => {
       return 0;
     }
     
-    // Weekly deposit amounts by rigor level (corrected from documents)
+    // Weekly deposit amounts by rigor level (converted to AMOY for testing: 0.01 AMOY = $1 USD)
     const rigorAmounts = {
-      light: 25,   // Will be calculated based on contract age: $100-$250/month
-      medium: 50,  // Years 1-3: $50/week, 4-6: $100/week, 7-10: $200/week, 11+: $250/week
-      heavy: 100,  // Years 1-3: $100/week, 4-6: $200/week, 7-10: $300/week, 11+: $400/week
+      light: convertUSDToAmoy(25),   // Will be calculated based on contract age: $100-$250/month
+      medium: convertUSDToAmoy(50),  // Years 1-3: $50/week, 4-6: $100/week, 7-10: $200/week, 11+: $250/week
+      heavy: convertUSDToAmoy(100),  // Years 1-3: $100/week, 4-6: $200/week, 7-10: $300/week, 11+: $400/week
       custom: 0    // Will be calculated from custom schedule
     };
     
@@ -897,13 +907,13 @@ const VaultClubWebsite = () => {
         const yearsElapsed = (now - contractStartDate) / (365.25 * 24 * 60 * 60 * 1000);
         
         if (yearsElapsed < 1) {
-          amount = 100 / 4.33; // $100/month ÷ 4.33 weeks/month
+          amount = convertUSDToAmoy(100 / 4.33); // $100/month ÷ 4.33 weeks/month
         } else if (yearsElapsed < 2) {
-          amount = 150 / 4.33; // $150/month ÷ 4.33 weeks/month
+          amount = convertUSDToAmoy(150 / 4.33); // $150/month ÷ 4.33 weeks/month
         } else if (yearsElapsed < 3) {
-          amount = 200 / 4.33; // $200/month ÷ 4.33 weeks/month
+          amount = convertUSDToAmoy(200 / 4.33); // $200/month ÷ 4.33 weeks/month
         } else {
-          amount = 250 / 4.33; // $250/month ÷ 4.33 weeks/month
+          amount = convertUSDToAmoy(250 / 4.33); // $250/month ÷ 4.33 weeks/month
         }
       }
       // For custom rigor, calculate based on custom schedule
@@ -917,9 +927,9 @@ const VaultClubWebsite = () => {
           const currentPeriod = subclub.customSchedule.find(period => 
             yearsElapsed >= (period.yearStart - 1) && yearsElapsed < period.yearEnd
           );
-          amount = currentPeriod ? currentPeriod.amount : subclub.customWeeklyAmount || 0;
+          amount = currentPeriod ? convertUSDToAmoy(currentPeriod.amount) : convertUSDToAmoy(subclub.customWeeklyAmount || 0);
         } else {
-          amount = subclub.customWeeklyAmount || 0;
+          amount = convertUSDToAmoy(subclub.customWeeklyAmount || 0);
         }
       }
       // For heavy rigor, calculate based on contract age
@@ -929,13 +939,13 @@ const VaultClubWebsite = () => {
         const yearsElapsed = (now - contractStartDate) / (365.25 * 24 * 60 * 60 * 1000);
         
         if (yearsElapsed < 3) {
-          amount = 100; // Years 1-3: $100/week
+          amount = convertUSDToAmoy(100); // Years 1-3: $100/week
         } else if (yearsElapsed < 6) {
-          amount = 200; // Years 4-6: $200/week
+          amount = convertUSDToAmoy(200); // Years 4-6: $200/week
         } else if (yearsElapsed < 10) {
-          amount = 300; // Years 7-10: $300/week
+          amount = convertUSDToAmoy(300); // Years 7-10: $300/week
         } else {
-          amount = 400; // Years 11+: $400/week
+          amount = convertUSDToAmoy(400); // Years 11+: $400/week
         }
       }
       
@@ -946,13 +956,13 @@ const VaultClubWebsite = () => {
         const yearsElapsed = (now - contractStartDate) / (365.25 * 24 * 60 * 60 * 1000);
         
         if (yearsElapsed < 3) {
-          amount = 50; // Years 1-3: $50/week
+          amount = convertUSDToAmoy(50); // Years 1-3: $50/week
         } else if (yearsElapsed < 6) {
-          amount = 100; // Years 4-6: $100/week
+          amount = convertUSDToAmoy(100); // Years 4-6: $100/week
         } else if (yearsElapsed < 10) {
-          amount = 200; // Years 7-10: $200/week
+          amount = convertUSDToAmoy(200); // Years 7-10: $200/week
         } else {
-          amount = 250; // Years 11+: $250/week
+          amount = convertUSDToAmoy(250); // Years 11+: $250/week
         }
       }
       
@@ -1096,13 +1106,13 @@ const VaultClubWebsite = () => {
               const yearsElapsed = (now - contractStartDate) / (365.25 * 24 * 60 * 60 * 1000);
               
               if (yearsElapsed < 1) {
-                contractWeeklyAmount = 100 / 4.33; // $100/month ÷ 4.33 weeks/month
+                contractWeeklyAmount = convertUSDToAmoy(100 / 4.33); // $100/month ÷ 4.33 weeks/month
               } else if (yearsElapsed < 2) {
-                contractWeeklyAmount = 150 / 4.33; // $150/month ÷ 4.33 weeks/month
+                contractWeeklyAmount = convertUSDToAmoy(150 / 4.33); // $150/month ÷ 4.33 weeks/month
               } else if (yearsElapsed < 3) {
-                contractWeeklyAmount = 200 / 4.33; // $200/month ÷ 4.33 weeks/month
+                contractWeeklyAmount = convertUSDToAmoy(200 / 4.33); // $200/month ÷ 4.33 weeks/month
               } else {
-                contractWeeklyAmount = 250 / 4.33; // $250/month ÷ 4.33 weeks/month
+                contractWeeklyAmount = convertUSDToAmoy(250 / 4.33); // $250/month ÷ 4.33 weeks/month
               }
             }
             // For custom rigor, calculate based on custom schedule
@@ -1128,13 +1138,13 @@ const VaultClubWebsite = () => {
               const yearsElapsed = (now - contractStartDate) / (365.25 * 24 * 60 * 60 * 1000);
               
               if (yearsElapsed < 3) {
-                contractWeeklyAmount = 100; // Years 1-3: $100/week
+                contractWeeklyAmount = convertUSDToAmoy(100); // Years 1-3: $100/week
               } else if (yearsElapsed < 6) {
-                contractWeeklyAmount = 200; // Years 4-6: $200/week
+                contractWeeklyAmount = convertUSDToAmoy(200); // Years 4-6: $200/week
               } else if (yearsElapsed < 10) {
-                contractWeeklyAmount = 300; // Years 7-10: $300/week
+                contractWeeklyAmount = convertUSDToAmoy(300); // Years 7-10: $300/week
               } else {
-                contractWeeklyAmount = 400; // Years 11+: $400/week
+                contractWeeklyAmount = convertUSDToAmoy(400); // Years 11+: $400/week
               }
             }
             
@@ -1145,13 +1155,13 @@ const VaultClubWebsite = () => {
               const yearsElapsed = (now - contractStartDate) / (365.25 * 24 * 60 * 60 * 1000);
               
               if (yearsElapsed < 3) {
-                contractWeeklyAmount = 50; // Years 1-3: $50/week
+                contractWeeklyAmount = convertUSDToAmoy(50); // Years 1-3: $50/week
               } else if (yearsElapsed < 6) {
-                contractWeeklyAmount = 100; // Years 4-6: $100/week  
+                contractWeeklyAmount = convertUSDToAmoy(100); // Years 4-6: $100/week  
               } else if (yearsElapsed < 10) {
-                contractWeeklyAmount = 200; // Years 7-10: $200/week
+                contractWeeklyAmount = convertUSDToAmoy(200); // Years 7-10: $200/week
               } else {
-                contractWeeklyAmount = 250; // Years 11+: $250/week
+                contractWeeklyAmount = convertUSDToAmoy(250); // Years 11+: $250/week
               }
             }
             
@@ -2170,7 +2180,7 @@ Your subclub is now live and ready for members to join!`);
                       ? 'Join Subclub to Deposit'
                       : !canDeposit() 
                         ? `Deposit in ${getDaysUntilNextDeposit()}d`
-                        : `Deposit ${calculateWeeklyDepositAmount()}`
+                        : `Deposit $${convertAmoyToUSD(calculateWeeklyDepositAmount()).toFixed(2)} (${calculateWeeklyDepositAmount().toFixed(4)} AMOY)`
                     }
                   </button>
                   {calculateWeeklyDepositAmount() > 0 && (
@@ -2965,26 +2975,26 @@ Your subclub is now live and ready for members to join!`);
                   {simulationRigor === 'light' && '$100-250/month scaling'}
                   {simulationRigor === 'medium' && '$50-250/week scaling'}
                   {simulationRigor === 'heavy' && '$100-400/week scaling'}
-                  {simulationRigor === 'custom' && `Fixed ${customSimulationAmount}/week`}
+                  {simulationRigor === 'custom' && `Fixed $${convertAmoyToUSD(customSimulationAmount).toFixed(2)}/week (${customSimulationAmount.toFixed(4)} AMOY)`}
                 </div>
                 
                 {/* Custom Amount Input */}
                 {simulationRigor === 'custom' && (
                   <div className="mt-3">
                     <label className="block text-xs font-medium text-slate-600 mb-1">
-                      Weekly Deposit Amount ($)
+                      Weekly Deposit Amount (USD equivalent)
                     </label>
                     <input
                       type="number"
                       min="1"
                       max="1000"
-                      value={customSimulationAmount}
-                      onChange={(e) => setCustomSimulationAmount(Number(e.target.value))}
+                      value={convertAmoyToUSD(customSimulationAmount)}
+                      onChange={(e) => setCustomSimulationAmount(convertUSDToAmoy(Number(e.target.value)))}
                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white/50 text-sm"
                       placeholder="Enter weekly amount"
                     />
                     <div className="text-xs text-slate-500 mt-1">
-                      Annual total: ${(customSimulationAmount * 52).toLocaleString()}
+                      Annual total: $${(convertAmoyToUSD(customSimulationAmount) * 52).toLocaleString()} (${(customSimulationAmount * 52).toFixed(2)} AMOY)
                     </div>
                   </div>
                 )}

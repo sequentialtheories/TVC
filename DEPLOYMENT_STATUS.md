@@ -43,8 +43,14 @@
 - Contract addresses updated in frontend code
 - Mock data replaced with live contract calls
 - Web3 integration configured for Amoy testnet
+- **Critical fixes applied:**
+  - SubClub factory integration fixed (no more mock addresses)
+  - Share club link functionality enhanced for external contracts
+  - Variable scope issues resolved
+  - Rigor level calculations verified against blueprint
 
-**Frontend Contract Configuration:** Lines 4-19 in `/frontend` file
+**Frontend Contract Configuration:** Lines 4-19 in `/frontend.html` file
+**Public URL:** https://user:0496369b641f17cb7bb4cf95611ac29f@tvc-contract-verifier-app-tunnel-ripl1axc.devinapps.com
 
 ## 📁 Key Files
 
@@ -65,8 +71,8 @@
 **Contract Verification Status:** FAILED
 - API Key: `KBRS82KPCBAWVFTT69MEKQAKKHFUFHEMGM` (Etherscan v2)
 - Error: "Invalid API Key (#err2)|POLYTestNet" and "Too many invalid api key attempts"
-- Attempts: Multiple verification attempts failed
-- Recommendation: Wait 24+ hours for rate limit reset, then retry
+- Attempts: **3 verification attempts completed** - maximum attempts reached
+- Status: Moving on to functionality testing per user instructions
 
 **Testnet Validation Status:** WAITING
 - Current Balance: 0.05 AMOY tokens

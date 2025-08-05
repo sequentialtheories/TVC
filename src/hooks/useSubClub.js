@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { blockchainService } from '../services/blockchain'
+import { apiService } from '../services/api'
 import { addSubClub, setCurrentSubClub } from '../store/slices/subclubSlice'
 import { addNotification } from '../store/slices/uiSlice'
 
@@ -10,29 +11,34 @@ export const useSubClub = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const createSubClub = async (members, lockPeriod, rigor, isCharged) => {
+  const createSubClub = async (subClubData) => {
     setLoading(true)
     setError(null)
     
     try {
-      const subClubAddress = await blockchainService.createSubClub(
-        members,
-        lockPeriod,
-        rigor,
-        isCharged
-      )
+      const response = await apiService.initSubClub(subClubData)
       
-      const subClubInfo = await blockchainService.getSubClubInfo(subClubAddress)
-      const newSubClub = { address: subClubAddress, ...subClubInfo }
+      if (response.success) {
+        const newSubClub = {
+          address: response.data.subClubAddress,
+          rigor: response.data.rigor,
+          lockPeriod: response.data.lockPeriod,
+          isCharged: response.data.isCharged,
+          members: response.data.members,
+          transactionHash: response.data.transactionHash
+        }
+        
+        dispatch(addSubClub(newSubClub))
+        dispatch(addNotification({
+          type: 'success',
+          message: 'SubClub created successfully!',
+          duration: 5000
+        }))
+        
+        return newSubClub
+      }
       
-      dispatch(addSubClub(newSubClub))
-      dispatch(addNotification({
-        type: 'success',
-        message: 'SubClub created successfully!',
-        duration: 5000
-      }))
-      
-      return newSubClub
+      throw new Error(response.error || 'Failed to create SubClub')
     } catch (err) {
       console.error('SubClub creation failed:', err)
       setError(err.message)
@@ -83,20 +89,27 @@ export const useSubClub = () => {
     }
   }
 
-  const makeDeposit = async (subClubAddress) => {
+  const makeDeposit = async (subClubAddress, amount) => {
     setLoading(true)
     setError(null)
     
     try {
-      const receipt = await blockchainService.makeDeposit(subClubAddress)
+      const response = await apiService.deposit({
+        subClubAddress,
+        amount
+      })
       
-      dispatch(addNotification({
-        type: 'success',
-        message: 'Deposit successful!',
-        duration: 5000
-      }))
+      if (response.success) {
+        dispatch(addNotification({
+          type: 'success',
+          message: 'Deposit successful!',
+          duration: 5000
+        }))
+        
+        return response.data
+      }
       
-      return receipt
+      throw new Error(response.error || 'Failed to deposit')
     } catch (err) {
       console.error('Deposit failed:', err)
       setError(err.message)
@@ -111,20 +124,27 @@ export const useSubClub = () => {
     }
   }
 
-  const requestEmergencyWithdraw = async (subClubAddress) => {
+  const requestEmergencyWithdraw = async (subClubAddress, reason) => {
     setLoading(true)
     setError(null)
     
     try {
-      const receipt = await blockchainService.requestEmergencyWithdraw(subClubAddress)
+      const response = await apiService.requestEmergencyWithdraw({
+        subClubAddress,
+        reason
+      })
       
-      dispatch(addNotification({
-        type: 'warning',
-        message: 'Emergency withdrawal requested. Awaiting multisig approval.',
-        duration: 8000
-      }))
+      if (response.success) {
+        dispatch(addNotification({
+          type: 'warning',
+          message: 'Emergency withdrawal requested. Awaiting multisig approval.',
+          duration: 8000
+        }))
+        
+        return response.data
+      }
       
-      return receipt
+      throw new Error(response.error || 'Failed to request emergency withdrawal')
     } catch (err) {
       console.error('Emergency withdrawal failed:', err)
       setError(err.message)
@@ -143,9 +163,16 @@ export const useSubClub = () => {
     if (!walletAddress) return []
     
     setLoading(true)
+    setError(null)
+    
     try {
-      const subClubs = await blockchainService.getUserSubClubs(walletAddress)
-      return subClubs
+      const response = await apiService.getTransactionHistory(walletAddress)
+      
+      if (response.success) {
+        return response.data.transactions || []
+      }
+      
+      return []
     } catch (err) {
       console.error('Failed to fetch user SubClubs:', err)
       setError(err.message)

@@ -57,24 +57,29 @@ class ApiService {
     return this.client.post('/vault/deposit', depositData)
   }
 
-  async getProgress(userId) {
-    return this.client.get(`/vault/progress/${userId}`)
+  async getProgress(subClubAddress) {
+    return this.client.get(`/vault/progress?subClubAddress=${subClubAddress}`)
   }
 
-  async getWBTCBalance(userId) {
-    return this.client.get(`/vault/wbtc-balance/${userId}`)
+  async getWBTCBalance(userAddress) {
+    return this.client.get(`/vault/wbtc-balance?userAddress=${userAddress}`)
   }
 
-  async getTransactionHistory(userId) {
-    return this.client.get(`/vault/history/${userId}`)
+  async getTransactionHistory(userAddress, subClubAddress = null) {
+    const params = new URLSearchParams({ userAddress });
+    if (subClubAddress) {
+      params.append('subClubAddress', subClubAddress);
+    }
+    return this.client.get(`/vault/history?${params.toString()}`)
   }
 
-  async requestEmergencyWithdraw(subClubAddress) {
-    return this.client.post('/emergency/withdraw', { subClubAddress })
+  async requestEmergencyWithdraw(withdrawData) {
+    return this.client.post('/emergency/withdraw', withdrawData)
   }
 
-  async getEmergencyStatus(subClubAddress) {
-    return this.client.get(`/emergency/status/${subClubAddress}`)
+  async getEmergencyStatus(subClubAddress = null) {
+    const params = subClubAddress ? `?subClubAddress=${subClubAddress}` : '';
+    return this.client.get(`/emergency/status${params}`)
   }
 
   async healthCheck() {

@@ -3391,6 +3391,9 @@ Your subclub is now live and ready for members to join!`);
       
       {/* Create Account Modal */}
       {activeModal === 'createAccount' && <CreateAccountModal />}
+      
+      {/* Create Account Modal */}
+      {activeModal === 'createAccount' && <CreateAccountModal />}
     </div>
   );
 };

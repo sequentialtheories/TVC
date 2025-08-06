@@ -10,43 +10,142 @@ const VAULT_CONTRACT_ABI = [
   "function getTotalMembers() view returns (uint256)",
   "function getMemberInfo(address) view returns (uint256, uint256, bool)",
   "function getVaultStats() view returns (uint256, uint256, uint256, uint256)",
-  // Add other contract functions as needed
+  // USDC contract ABI for deposits
+const USDC_ABI = [
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function balanceOf(address owner) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)"
 ];
 
-// Connect wallet and return address or null
+// Connect wallet with Sequence Theory SSO integration
 async function connectWallet() {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return null;
-  }
   try {
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-    return accounts[0];
-  } catch (error) {
-    console.error("Wallet connection rejected", error);
+    const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://qldjhlnsphlixmzzrdwi.supabase.co/functions/v1';
+    const VAULT_CLUB_API_KEY = process.env.REACT_APP_VAULT_CLUB_API_KEY || '';
+    
+    if (!VAULT_CLUB_API_KEY) {
+      throw new Error('Vault Club API key not configured');
+    }
+    
+    const stToken = localStorage.getItem('st_token');
+    
+    if (stToken) {
+      // Exchange ST token for vault session
+      const response = await fetch(`${API_BASE_URL}/vault-auth/exchange-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-vault-club-api-key': VAULT_CLUB_API_KEY
+        },
+        body: JSON.stringify({ st_token: stToken })
+      });
+      
+      const data = await response.json();
+      if (data.success && data.data.wallet) {
+        localStorage.setItem('vault_access_token', data.data.access_token);
+        return data.data.wallet.address;
+      }
+    }
+    
+    // Redirect to Sequence Theory login if no valid token
+    const loginUrl = process.env.REACT_APP_ST_AUTH_URL || 'https://sequencetheory.com/auth';
+    window.location.href = `${loginUrl}?redirect=${encodeURIComponent(window.location.href)}`;
     return null;
+    
+  } catch (error) {
+    console.error('TVC authentication failed, falling back to MetaMask:', error);
+    
+    // Fallback to MetaMask if TVC auth fails
+    if (!window.ethereum) {
+      alert("Please connect through Sequence Theory or install MetaMask.");
+      return null;
+    }
+    try {
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      return accounts[0];
+    } catch (metaMaskError) {
+      console.error("Wallet connection rejected", metaMaskError);
+      return null;
+    }
   }
 }
 
-// Get vault balance for address - fallback version without ethers dependency
+// Get vault balance for address - integrated with TVC backend API
 async function getVaultBalance(address) {
-  // Since ethers may not be available, return mock data for now
-  // In production, implement proper Web3 calls
-  return "0";
+  try {
+    const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://qldjhlnsphlixmzzrdwi.supabase.co/functions/v1';
+    const VAULT_CLUB_API_KEY = process.env.REACT_APP_VAULT_CLUB_API_KEY || '';
+    const token = localStorage.getItem('vault_access_token');
+    
+    if (!VAULT_CLUB_API_KEY) {
+      throw new Error('Vault Club API key not configured');
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/vault-operations/progress`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-vault-club-api-key': VAULT_CLUB_API_KEY,
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      return data.data?.total_balance?.toString() || "0";
+    }
+    throw new Error(data.error || 'Failed to fetch balance');
+  } catch (error) {
+    console.error('Error fetching vault balance from TVC API:', error);
+    return "0";
+  }
 }
 
-// Get vault stats from contract - fallback version
+// Get vault stats from TVC backend API
 async function getVaultStats() {
-  // Return consistent mock data - if no real deposits, vault should be empty
-  return { 
-    totalMembers: 0, 
-    totalDeposits: "0", 
-    systemHealth: 100, 
-    transactions: 0,
-    strand1Balance: "0",
-    strand2Balance: "0",
-    strand3Balance: "0" 
-  };
+  try {
+    const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://qldjhlnsphlixmzzrdwi.supabase.co/functions/v1';
+    const VAULT_CLUB_API_KEY = process.env.REACT_APP_VAULT_CLUB_API_KEY || '';
+    const token = localStorage.getItem('vault_access_token');
+    
+    if (!VAULT_CLUB_API_KEY) {
+      throw new Error('Vault Club API key not configured');
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/vault-operations/progress`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-vault-club-api-key': VAULT_CLUB_API_KEY,
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      const stats = data.data || {};
+      return {
+        totalMembers: stats.total_members || 0,
+        totalDeposits: stats.total_tvl?.toString() || "0",
+        systemHealth: 100,
+        transactions: stats.total_transactions || 0,
+        strand1Balance: stats.strand1_balance?.toString() || "0",
+        strand2Balance: stats.strand2_balance?.toString() || "0",
+        strand3Balance: stats.strand3_balance?.toString() || "0"
+      };
+    }
+    throw new Error(data.error || 'Failed to fetch stats');
+  } catch (error) {
+    console.error('Error fetching vault stats from TVC API:', error);
+    return { 
+      totalMembers: 0, 
+      totalDeposits: "0", 
+      systemHealth: 100, 
+      transactions: 0,
+      strand1Balance: "0",
+      strand2Balance: "0",
+      strand3Balance: "0" 
+    };
+  }
 }
 
 // Get AAVE lending rates
@@ -107,37 +206,145 @@ async function getMemberAllocation() {
   return [];
 }
 
-// Deposit amount (in ether) to vault contract
+// Deposit amount to vault using real blockchain transaction
 async function depositToVault(amountEther) {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return false;
-  }
   try {
-    // Simulate deposit for demo purposes
-    console.log(`Depositing ${amountEther} to vault...`);
-    alert(`Demo mode: Automated deposit of ${amountEther} successful!`);
-    return true;
+    const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://qldjhlnsphlixmzzrdwi.supabase.co/functions/v1';
+    const VAULT_CLUB_API_KEY = process.env.REACT_APP_VAULT_CLUB_API_KEY || '';
+    const token = localStorage.getItem('vault_access_token');
+    
+    if (!token) {
+      alert("Please connect your wallet first.");
+      return false;
+    }
+    
+    if (!VAULT_CLUB_API_KEY) {
+      throw new Error('Vault Club API key not configured');
+    }
+    
+    if (!window.ethereum) {
+      alert("MetaMask is required for blockchain transactions.");
+      return false;
+    }
+    
+    // Execute real USDC deposit transaction
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer = provider.getSigner();
+    const userAddress = await signer.getAddress();
+    
+    const USDC_ADDRESS = process.env.REACT_APP_USDC_ADDRESS || '0xA0b86a33E6441b8435b662f0E2d0c2837b0b3c0f';
+    const VAULT_CONTRACT_ADDRESS = process.env.REACT_APP_VAULT_CONTRACT_ADDRESS || '';
+    
+    if (!VAULT_CONTRACT_ADDRESS) {
+      throw new Error('Vault contract address not configured');
+    }
+    
+    // Validate and sanitize amount input
+    const sanitizedAmount = sanitizeInput(amountEther.toString());
+    const amountUSDC = parseFloat(sanitizedAmount);
+    
+    if (!validateAmount(amountUSDC)) {
+      throw new Error('Invalid deposit amount');
+    }
+    
+    // Rate limiting check
+    const userAddress = await signer.getAddress();
+    if (isRateLimited(`deposit_${userAddress}`, 5, 60000)) {
+      throw new Error('Too many deposit attempts. Please wait before trying again.');
+    }
+    
+    const amountWei = ethers.utils.parseUnits(amountUSDC.toString(), 6);
+    
+    // Use the USDC_ABI defined at the top of the file
+    
+    const usdcContract = new ethers.Contract(USDC_ADDRESS, USDC_ABI, signer);
+    
+    // Check balance
+    const balance = await usdcContract.balanceOf(userAddress);
+    if (balance.lt(amountWei)) {
+      throw new Error('Insufficient USDC balance');
+    }
+    
+    // Execute transfer to vault contract
+    const tx = await usdcContract.transfer(VAULT_CONTRACT_ADDRESS, amountWei);
+    const receipt = await tx.wait();
+    
+    if (receipt.status !== 1) {
+      throw new Error('Transaction failed');
+    }
+    
+    // Validate transaction hash
+    if (!validateTransactionHash(receipt.transactionHash)) {
+      throw new Error('Invalid transaction hash received');
+    }
+    
+    // Record deposit in backend
+    const response = await fetch(`${API_BASE_URL}/vault-operations/deposit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-vault-club-api-key': VAULT_CLUB_API_KEY,
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        amount: amountUSDC,
+        token: 'USDC',
+        transaction_hash: receipt.transactionHash
+      })
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      alert(`Deposit successful! Amount: $${amountUSDC}\nTransaction: ${receipt.transactionHash}`);
+      return true;
+    } else {
+      throw new Error(data.error || 'Backend recording failed');
+    }
   } catch (error) {
     console.error("Deposit failed:", error);
-    alert("Deposit transaction failed.");
+    alert(`Deposit failed: ${error.message}`);
     return false;
   }
 }
 
-// Harvest and route yields
+// Harvest and route yields using real blockchain transactions
 async function harvestAndRoute() {
   if (!window.ethereum) {
     alert("MetaMask is required to use this app.");
     return false;
   }
+  
   try {
-    // Simulate harvest for demo purposes
-    alert("Demo mode: Harvest simulation successful!");
-    return true;
+    const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://qldjhlnsphlixmzzrdwi.supabase.co/functions/v1';
+    const VAULT_CLUB_API_KEY = process.env.REACT_APP_VAULT_CLUB_API_KEY || '';
+    const token = localStorage.getItem('vault_access_token');
+    
+    if (!token) {
+      alert("Please connect your wallet first.");
+      return false;
+    }
+    
+    // Call harvest endpoint
+    const response = await fetch(`${API_BASE_URL}/vault-operations/harvest`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-vault-club-api-key': VAULT_CLUB_API_KEY,
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      alert(`✅ Harvest successful!\n\nYields harvested and routed to strands.\nTransaction hash: ${data.data.transaction_hash || 'N/A'}`);
+      return true;
+    } else {
+      alert(`❌ Harvest failed: ${data.error}`);
+      return false;
+    }
   } catch (error) {
     console.error("Harvest failed:", error);
-    alert("Harvest transaction failed.");
+    alert("Harvest transaction failed. Please try again.");
     return false;
   }
 }
@@ -821,64 +1028,232 @@ const VaultClubWebsite = () => {
       return;
     }
     
-    // Generate a realistic contract address
-    const contractAddress = `0x${Math.random().toString(16).substr(2, 40)}`;
-    
-    // Assign a random color when creating the contract
-    const colors = [
-      'border-yellow-500',   
-      'border-green-500',   
-      'border-blue-500',    
-      'border-red-500',     
-      'border-purple-500',  
-      'border-orange-500',  
-      'border-pink-500',    
-      'border-indigo-500'   
-    ];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
-    
-    // Create new subclub object with assigned color
-    const newSubclub = {
-      id: Date.now(),
-      contractAddress,
-      creator: walletAddress,
-      maxMembers: clubCreationData.maxMembers,
-      lockupPeriod: clubCreationData.lockupPeriod,
-      rigorLevel: clubCreationData.rigorLevel,
-      isPrivate: clubCreationData.isPrivate,
-      isChargedContract: clubCreationData.isChargedContract,
-      currentMembers: 1, // Creator is first member
-      createdAt: new Date().toISOString(),
-      status: 'active',
-      totalDeposits: 0,
-      members: [walletAddress],
-      borderColor: randomColor, // Store the color with the contract
-      customWeeklyAmount: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customWeeklyAmount : undefined,
-      customSchedule: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customSchedule : undefined,
-      // Contract-specific strand balances
-      strand1Balance: "0",
-      strand2Balance: "0", 
-      strand3Balance: "0",
-      totalContractBalance: "0"
-    };
-    
-    // Add to deployed subclubs
-    setDeployedSubclubs(prev => [...prev, newSubclub]);
-    
-    // Success notification
-    alert(`✅ SubClub Contract Deployed Successfully!
+    try {
+      const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://qldjhlnsphlixmzzrdwi.supabase.co/functions/v1';
+      const VAULT_CLUB_API_KEY = process.env.REACT_APP_VAULT_CLUB_API_KEY || '';
+      const token = localStorage.getItem('vault_access_token');
+      
+      if (!token) {
+        alert("Please authenticate first");
+        return;
+      }
+      
+      // Create contract via sequence-theory API
+      const contractData = {
+        name: `${clubCreationData.rigorLevel.charAt(0).toUpperCase() + clubCreationData.rigorLevel.slice(1)} Rigor Contract`,
+        description: `${clubCreationData.lockupPeriod} ${clubCreationData.isChargedContract ? 'month' : 'year'} lockup with ${clubCreationData.maxMembers} max members`,
+        target_amount: clubCreationData.maxMembers * 10000,
+        minimum_contribution: clubCreationData.rigorLevel === 'light' ? 100 : clubCreationData.rigorLevel === 'medium' ? 200 : 400,
+        maximum_participants: clubCreationData.maxMembers,
+        start_date: new Date().toISOString(),
+        end_date: new Date(Date.now() + (clubCreationData.lockupPeriod * (clubCreationData.isChargedContract ? 30 : 365) * 24 * 60 * 60 * 1000)).toISOString()
+      };
+      
+      const response = await fetch(`${API_BASE_URL}/vault-operations/create-contract`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-vault-club-api-key': VAULT_CLUB_API_KEY,
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(contractData)
+      });
+      
+      const data = await response.json();
+      if (data.success && data.data.contract) {
+        const contract = data.data.contract;
+        
+        // Assign a random color when creating the contract
+        const colors = [
+          'border-yellow-500',   
+          'border-green-500',   
+          'border-blue-500',    
+          'border-red-500',     
+          'border-purple-500',  
+          'border-orange-500',  
+          'border-pink-500',    
+          'border-indigo-500'   
+        ];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        
+        // Create new subclub object with real contract data
+        const newSubclub = {
+          id: contract.id,
+          contractAddress: contract.id,
+          creator: walletAddress,
+          maxMembers: contract.maximum_participants,
+          lockupPeriod: clubCreationData.lockupPeriod,
+          rigorLevel: clubCreationData.rigorLevel,
+          isPrivate: clubCreationData.isPrivate,
+          isChargedContract: clubCreationData.isChargedContract,
+          currentMembers: 1,
+          createdAt: contract.created_at,
+          status: contract.status,
+          totalDeposits: contract.current_amount,
+          members: [walletAddress],
+          borderColor: randomColor,
+          customWeeklyAmount: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customWeeklyAmount : undefined,
+          customSchedule: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customSchedule : undefined,
+          strand1Balance: "0",
+          strand2Balance: "0", 
+          strand3Balance: "0",
+          totalContractBalance: contract.current_amount.toString()
+        };
+        
+        // Add to deployed subclubs
+        setDeployedSubclubs(prev => [...prev, newSubclub]);
+        
+        alert(`✅ SubClub Contract Created Successfully!
 
-Contract Address: ${contractAddress}
+Contract ID: ${contract.id}
 Contract Type: ${clubCreationData.isChargedContract ? 'Charged Contract' : 'Traditional Contract'}
-Max Members: ${clubCreationData.maxMembers}
+Max Members: ${contract.maximum_participants}
 Lockup Period: ${clubCreationData.lockupPeriod} ${clubCreationData.isChargedContract ? 'month' : 'year'}${clubCreationData.lockupPeriod === 1 ? '' : 's'}
 Investment Rigor: ${clubCreationData.rigorLevel.charAt(0).toUpperCase() + clubCreationData.rigorLevel.slice(1)}
-Privacy: ${clubCreationData.isPrivate ? 'Private (invitation only)' : 'Public (visible to all)'}
-Utility Fee: ${clubCreationData.isChargedContract ? '$1.25' : '$1.00'}/user/week
+Target Amount: $${contract.target_amount.toLocaleString()}
 
 Your subclub is now live and ready for members to join!`);
-    
-    setActiveModal(null);
+        
+        setActiveModal(null);
+      } else {
+        alert(`❌ Contract creation failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Contract creation error:', error);
+      alert('❌ Contract creation failed. Please try again.');
+    }
+  };
+
+  // Create Account Modal Component
+  const CreateAccountModal = () => {
+    const [accountData, setAccountData] = useState({
+      email: '',
+      password: '',
+      name: '',
+      confirmPassword: ''
+    });
+    const [isCreating, setIsCreating] = useState(false);
+
+    const handleCreateAccount = async () => {
+      if (!accountData.email || !accountData.password || !accountData.name) {
+        alert('Please fill in all required fields');
+        return;
+      }
+      
+      if (accountData.password !== accountData.confirmPassword) {
+        alert('Passwords do not match');
+        return;
+      }
+
+      setIsCreating(true);
+      try {
+        const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://qldjhlnsphlixmzzrdwi.supabase.co/functions/v1';
+        const VAULT_CLUB_API_KEY = process.env.REACT_APP_VAULT_CLUB_API_KEY || '';
+        
+        const response = await fetch(`${API_BASE_URL}/vault-club-user-creation`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-vault-club-api-key': VAULT_CLUB_API_KEY
+          },
+          body: JSON.stringify({
+            email: accountData.email,
+            password: accountData.password,
+            name: accountData.name,
+            metadata: { created_via: 'vault_club_frontend' }
+          })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          localStorage.setItem('st_token', data.data.api_key);
+          alert(`✅ Account Created Successfully!\n\nEmail: ${data.data.user.email}\nWallet: ${data.data.wallet.address}\n\nYou can now create contracts and start earning!`);
+          setActiveModal(null);
+          connectWallet();
+        } else {
+          alert(`❌ Account creation failed: ${data.error}`);
+        }
+      } catch (error) {
+        console.error('Account creation error:', error);
+        alert('❌ Account creation failed. Please try again.');
+      } finally {
+        setIsCreating(false);
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
+          <div className="bg-gradient-to-r from-green-500 to-teal-600 p-6 rounded-t-2xl text-white">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-xl font-bold">Create Sequence Theory Account</h3>
+                <p className="text-white/80">Join The Vault Club with automatic wallet creation</p>
+              </div>
+              <button onClick={closeModal} className="text-white/80 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+          
+          <div className="p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+              <input
+                type="text"
+                value={accountData.name}
+                onChange={(e) => setAccountData(prev => ({...prev, name: e.target.value}))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="Enter your full name"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+              <input
+                type="email"
+                value={accountData.email}
+                onChange={(e) => setAccountData(prev => ({...prev, email: e.target.value}))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="Enter your email"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+              <input
+                type="password"
+                value={accountData.password}
+                onChange={(e) => setAccountData(prev => ({...prev, password: e.target.value}))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="Create a secure password"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
+              <input
+                type="password"
+                value={accountData.confirmPassword}
+                onChange={(e) => setAccountData(prev => ({...prev, confirmPassword: e.target.value}))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="Confirm your password"
+              />
+            </div>
+            
+            <div className="pt-4">
+              <button 
+                onClick={handleCreateAccount}
+                disabled={isCreating}
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-4 rounded-lg font-medium text-lg transition-colors"
+              >
+                {isCreating ? 'Creating Account...' : 'Create Account & Wallet'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const CreateClubModal = () => {    
@@ -1981,12 +2356,20 @@ Your subclub is now live and ready for members to join!`);
                 {deployedSubclubs.length === 0 ? "Be the first to deploy a Subclub contract" : "Create another subclub or join existing ones"}
               </div>
             </div>
-            <button 
-              onClick={() => setActiveModal('createClub')}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-            >
-              Create New Subclub
-            </button>
+            <div className="flex space-x-3">
+              <button 
+                onClick={() => setActiveModal('createAccount')}
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+              >
+                Create Account
+              </button>
+              <button 
+                onClick={() => setActiveModal('createClub')}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+              >
+                Create New Subclub
+              </button>
+            </div>
           </div>
 
           <div>
@@ -3005,6 +3388,9 @@ Your subclub is now live and ready for members to join!`);
 
       {/* Create Club Modal */}
       {activeModal === 'createClub' && <CreateClubModal />}
+      
+      {/* Create Account Modal */}
+      {activeModal === 'createAccount' && <CreateAccountModal />}
     </div>
   );
 };

@@ -10,18 +10,25 @@ const VAULT_CONTRACT_ABI = [
   "function getTotalMembers() view returns (uint256)",
   "function getMemberInfo(address) view returns (uint256, uint256, bool)",
   "function getVaultStats() view returns (uint256, uint256, uint256, uint256)",
-  // Add other contract functions as needed
+  // USDC contract ABI for deposits
+const USDC_ABI = [
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function balanceOf(address owner) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)"
 ];
 
 // Connect wallet with Sequence Theory SSO integration
 async function connectWallet() {
   try {
-    // Try TVC backend authentication first
-    const API_BASE_URL = 'https://your-supabase-url.supabase.co/functions/v1';
-    const VAULT_CLUB_API_KEY = 'your-vault-club-api-key';
+    const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://qldjhlnsphlixmzzrdwi.supabase.co/functions/v1';
+    const VAULT_CLUB_API_KEY = process.env.REACT_APP_VAULT_CLUB_API_KEY || '';
+    
+    if (!VAULT_CLUB_API_KEY) {
+      throw new Error('Vault Club API key not configured');
+    }
     
     const stToken = localStorage.getItem('st_token');
-    let authResult;
     
     if (stToken) {
       // Exchange ST token for vault session
@@ -39,35 +46,19 @@ async function connectWallet() {
         localStorage.setItem('vault_access_token', data.data.access_token);
         return data.data.wallet.address;
       }
-    } else {
-      // Demo credentials for testing
-      const response = await fetch(`${API_BASE_URL}/vault-auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-vault-club-api-key': VAULT_CLUB_API_KEY
-        },
-        body: JSON.stringify({
-          email: 'demo@sequencetheory.com',
-          password: 'demo_password'
-        })
-      });
-      
-      const data = await response.json();
-      if (data.success && data.data.wallet) {
-        localStorage.setItem('vault_access_token', data.data.access_token);
-        localStorage.setItem('st_token', data.data.st_token);
-        return data.data.wallet.address;
-      }
     }
     
-    throw new Error('TVC authentication failed');
+    // Redirect to Sequence Theory login if no valid token
+    const loginUrl = process.env.REACT_APP_ST_AUTH_URL || 'https://sequencetheory.com/auth';
+    window.location.href = `${loginUrl}?redirect=${encodeURIComponent(window.location.href)}`;
+    return null;
+    
   } catch (error) {
     console.error('TVC authentication failed, falling back to MetaMask:', error);
     
     // Fallback to MetaMask if TVC auth fails
     if (!window.ethereum) {
-      alert("MetaMask is required to use this app.");
+      alert("Please connect through Sequence Theory or install MetaMask.");
       return null;
     }
     try {
@@ -83,9 +74,13 @@ async function connectWallet() {
 // Get vault balance for address - integrated with TVC backend API
 async function getVaultBalance(address) {
   try {
-    const API_BASE_URL = 'https://your-supabase-url.supabase.co/functions/v1';
-    const VAULT_CLUB_API_KEY = 'your-vault-club-api-key';
+    const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://qldjhlnsphlixmzzrdwi.supabase.co/functions/v1';
+    const VAULT_CLUB_API_KEY = process.env.REACT_APP_VAULT_CLUB_API_KEY || '';
     const token = localStorage.getItem('vault_access_token');
+    
+    if (!VAULT_CLUB_API_KEY) {
+      throw new Error('Vault Club API key not configured');
+    }
     
     const response = await fetch(`${API_BASE_URL}/vault-operations/progress`, {
       headers: {
@@ -102,16 +97,20 @@ async function getVaultBalance(address) {
     throw new Error(data.error || 'Failed to fetch balance');
   } catch (error) {
     console.error('Error fetching vault balance from TVC API:', error);
-    return "0"; // Fallback
+    return "0";
   }
 }
 
 // Get vault stats from TVC backend API
 async function getVaultStats() {
   try {
-    const API_BASE_URL = 'https://your-supabase-url.supabase.co/functions/v1';
-    const VAULT_CLUB_API_KEY = 'your-vault-club-api-key';
+    const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://qldjhlnsphlixmzzrdwi.supabase.co/functions/v1';
+    const VAULT_CLUB_API_KEY = process.env.REACT_APP_VAULT_CLUB_API_KEY || '';
     const token = localStorage.getItem('vault_access_token');
+    
+    if (!VAULT_CLUB_API_KEY) {
+      throw new Error('Vault Club API key not configured');
+    }
     
     const response = await fetch(`${API_BASE_URL}/vault-operations/progress`, {
       headers: {
@@ -207,11 +206,11 @@ async function getMemberAllocation() {
   return [];
 }
 
-// Deposit amount to vault using TVC backend API
+// Deposit amount to vault using real blockchain transaction
 async function depositToVault(amountEther) {
   try {
-    const API_BASE_URL = 'https://your-supabase-url.supabase.co/functions/v1';
-    const VAULT_CLUB_API_KEY = 'your-vault-club-api-key';
+    const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://qldjhlnsphlixmzzrdwi.supabase.co/functions/v1';
+    const VAULT_CLUB_API_KEY = process.env.REACT_APP_VAULT_CLUB_API_KEY || '';
     const token = localStorage.getItem('vault_access_token');
     
     if (!token) {
@@ -219,12 +218,67 @@ async function depositToVault(amountEther) {
       return false;
     }
     
-    // Convert amount to USDC (assuming 1:1 for demo)
-    const amountUSDC = parseFloat(amountEther);
+    if (!VAULT_CLUB_API_KEY) {
+      throw new Error('Vault Club API key not configured');
+    }
     
-    // Generate mock transaction hash for demo
-    const txHash = '0x' + Math.random().toString(16).substr(2, 64);
+    if (!window.ethereum) {
+      alert("MetaMask is required for blockchain transactions.");
+      return false;
+    }
     
+    // Execute real USDC deposit transaction
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer = provider.getSigner();
+    const userAddress = await signer.getAddress();
+    
+    const USDC_ADDRESS = process.env.REACT_APP_USDC_ADDRESS || '0xA0b86a33E6441b8435b662f0E2d0c2837b0b3c0f';
+    const VAULT_CONTRACT_ADDRESS = process.env.REACT_APP_VAULT_CONTRACT_ADDRESS || '';
+    
+    if (!VAULT_CONTRACT_ADDRESS) {
+      throw new Error('Vault contract address not configured');
+    }
+    
+    // Validate and sanitize amount input
+    const sanitizedAmount = sanitizeInput(amountEther.toString());
+    const amountUSDC = parseFloat(sanitizedAmount);
+    
+    if (!validateAmount(amountUSDC)) {
+      throw new Error('Invalid deposit amount');
+    }
+    
+    // Rate limiting check
+    const userAddress = await signer.getAddress();
+    if (isRateLimited(`deposit_${userAddress}`, 5, 60000)) {
+      throw new Error('Too many deposit attempts. Please wait before trying again.');
+    }
+    
+    const amountWei = ethers.utils.parseUnits(amountUSDC.toString(), 6);
+    
+    // Use the USDC_ABI defined at the top of the file
+    
+    const usdcContract = new ethers.Contract(USDC_ADDRESS, USDC_ABI, signer);
+    
+    // Check balance
+    const balance = await usdcContract.balanceOf(userAddress);
+    if (balance.lt(amountWei)) {
+      throw new Error('Insufficient USDC balance');
+    }
+    
+    // Execute transfer to vault contract
+    const tx = await usdcContract.transfer(VAULT_CONTRACT_ADDRESS, amountWei);
+    const receipt = await tx.wait();
+    
+    if (receipt.status !== 1) {
+      throw new Error('Transaction failed');
+    }
+    
+    // Validate transaction hash
+    if (!validateTransactionHash(receipt.transactionHash)) {
+      throw new Error('Invalid transaction hash received');
+    }
+    
+    // Record deposit in backend
     const response = await fetch(`${API_BASE_URL}/vault-operations/deposit`, {
       method: 'POST',
       headers: {
@@ -235,16 +289,16 @@ async function depositToVault(amountEther) {
       body: JSON.stringify({
         amount: amountUSDC,
         token: 'USDC',
-        transaction_hash: txHash
+        transaction_hash: receipt.transactionHash
       })
     });
     
     const data = await response.json();
     if (data.success) {
-      alert(`Deposit successful! Amount: $${amountUSDC}\nTransaction: ${data.data.transaction_hash}`);
+      alert(`Deposit successful! Amount: $${amountUSDC}\nTransaction: ${receipt.transactionHash}`);
       return true;
     } else {
-      throw new Error(data.error || 'Deposit failed');
+      throw new Error(data.error || 'Backend recording failed');
     }
   } catch (error) {
     console.error("Deposit failed:", error);

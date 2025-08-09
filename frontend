@@ -1063,7 +1063,7 @@ Your subclub is now live and ready for members to join!`);
                 <h3 className="text-xl font-bold">
                   {authMode === 'signup' ? 'Create Account' : 'Sign In'}
                 </h3>
-                <p className="text-white/80">Access your Vault Club account</p>
+                <p className="text-white/80">Access your Sequence Theory account</p>
               </div>
               <button onClick={() => setShowAuthModal(false)} className="text-white/80 hover:text-white">
                 <X className="w-6 h-6" />

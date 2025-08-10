@@ -2175,8 +2175,10 @@ Your subclub is now live and ready for members to join!`);
                             <button 
                               className="text-xs px-3 py-1 rounded-full transition-colors bg-green-500 hover:bg-green-600 text-white"
                               onClick={() => {
-                                // Join contract logic here
-                                alert(`Joining contract ${subclub.contractAddress.slice(0,8)}...`);
+                                const joinTarget = subclub.id ?? subclub.contractAddress;
+                                const url = new URL(window.location.href);
+                                url.searchParams.set('join', String(joinTarget));
+                                window.location.href = url.toString();
                               }}
                             >
                               Join

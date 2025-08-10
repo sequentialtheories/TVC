@@ -271,7 +271,11 @@ const VaultClubWebsite = () => {
     const existing = getTvcSession();
     if (existing?.session?.access_token) {
       setWalletConnected(true);
-      setWalletAddress(existing?.wallet?.address || walletAddress);
+      const addr = existing?.wallet?.address || walletAddress;
+      setWalletAddress(addr);
+      if (addr) {
+        getVaultBalance(addr).then(setVaultBalance).catch(() => {});
+      }
     }
   }, []);
 
@@ -306,6 +310,10 @@ const VaultClubWebsite = () => {
       if (data?.wallet?.address) {
         setWalletConnected(true);
         setWalletAddress(data.wallet.address);
+        try {
+          const bal = await getVaultBalance(data.wallet.address);
+          setVaultBalance(bal);
+        } catch {}
       }
       closeAuthFlow();
     } catch (err) {

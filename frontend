@@ -12,6 +12,79 @@ const VAULT_CONTRACT_ABI = [
   "function getVaultStats() view returns (uint256, uint256, uint256, uint256)",
   // Add other contract functions as needed
 ];
+const ST_FUNCTIONS_BASE = (window && window.__TVC_CONFIG && window.__TVC_CONFIG.functionsBase) || '';
+const ST_VAULT_CLUB_API_KEY = (window && window.__TVC_CONFIG && window.__TVC_CONFIG.vaultClubApiKey) || '';
+const tvcHeaders = (token) => ({
+  'Content-Type': 'application/json',
+  'x-vault-club-api-key': ST_VAULT_CLUB_API_KEY || '',
+  ...(token ? { Authorization: `Bearer ${token}` } : {})
+});
+const tvcApi = (() => {
+  const base = ST_FUNCTIONS_BASE;
+  const key = ST_VAULT_CLUB_API_KEY;
+  const headers = (token) => ({ 'Content-Type': 'application/json', 'x-vault-club-api-key': key || '', ...(token ? { Authorization: `Bearer ${token}` } : {}) });
+  async function req(path, init = {}, token) {
+    if (!base) throw new Error('Missing Sequence Theory functions base URL');
+    const method = (init.method || 'GET').toUpperCase();
+    const defaultIdk = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const h = { ...(init.headers || {}), ...headers(token) };
+    if (method === 'POST' && !('Idempotency-Key' in h)) h['Idempotency-Key'] = defaultIdk;
+    const res = await fetch(`${base}${path}`, { ...init, headers: h });
+    let json = null;
+    try { json = await res.json(); } catch { json = null; }
+    if (!res.ok || !(json && json.success)) throw new Error((json && json.error) || `HTTP ${res.status}`);
+    return json.data;
+  }
+  return {
+    signup: (email, password, name) => req('/vault-club-user-creation', { method: 'POST', body: JSON.stringify({ email, password, name }) }),
+    login: (email, password) => req('/vault-club-auth-sync', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    createContract: (payload, token) => req('/vault-club-contract-create', { method: 'POST', body: JSON.stringify(payload) }, token),
+    joinContract: (payload, token) => req('/vault-club-contract-join', { method: 'POST', body: JSON.stringify(payload) }, token),
+    getBalance: (wallet) => req(`/vault-club-balance?wallet=${encodeURIComponent(wallet)}`, { method: 'GET' }),
+    getStats: () => req('/vault-club-stats', { method: 'GET' }),
+    deposit: (amount, wallet, token) => req('/vault-club-deposit', { method: 'POST', body: JSON.stringify({ amount: String(amount), wallet_address: wallet }) }, token),
+    harvest: (token) => req('/vault-club-harvest', { method: 'POST', body: JSON.stringify({}) }, token),
+    forum: {
+      listPosts: (category) => req(`/forum-post-list${category ? `?category=${encodeURIComponent(category)}` : ''}`, { method: 'GET' }),
+      createPost: (post, token) => req('/forum-post-create', { method: 'POST', body: JSON.stringify(post) }, token),
+      listReplies: (postId) => req(`/forum-reply-list?post_id=${encodeURIComponent(postId)}`, { method: 'GET' }),
+      createReply: (reply, token) => req('/forum-reply-create', { method: 'POST', body: JSON.stringify(reply) }, token),
+    },
+  };
+})();
+
+async function stSignup(email, password, name) {
+  return tvcApi.signup(email, password, name);
+}
+
+async function stLogin(email, password) {
+  return tvcApi.login(email, password);
+}
+async function stCreateContract(payload, token) {
+  return tvcApi.createContract(payload, token);
+}
+
+async function stJoinContract(payload, token) {
+  return tvcApi.joinContract(payload, token);
+}
+
+function saveTvcSession(session) {
+  try {
+    localStorage.setItem('tvc.auth', JSON.stringify(session));
+  } catch {}
+}
+
+function getTvcSession() {
+  try {
+    const raw = localStorage.getItem('tvc.auth');
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+
 
 // Connect wallet and return address or null
 async function connectWallet() {
@@ -28,25 +101,32 @@ async function connectWallet() {
   }
 }
 
-// Get vault balance for address - fallback version without ethers dependency
+// Get vault balance for address - via SDK
 async function getVaultBalance(address) {
-  // Since ethers may not be available, return mock data for now
-  // In production, implement proper Web3 calls
-  return "0";
+  try {
+    const data = await tvcApi.getBalance(address);
+    return String((data && data.balance) || "0");
+  } catch {
+    return "0";
+  }
 }
 
-// Get vault stats from contract - fallback version
+// Get vault stats from contract - via SDK
 async function getVaultStats() {
-  // Return consistent mock data - if no real deposits, vault should be empty
-  return { 
-    totalMembers: 0, 
-    totalDeposits: "0", 
-    systemHealth: 100, 
-    transactions: 0,
-    strand1Balance: "0",
-    strand2Balance: "0",
-    strand3Balance: "0" 
-  };
+  try {
+    const d = await tvcApi.getStats();
+    return {
+      totalMembers: d.totalMembers ?? 0,
+      totalDeposits: d.totalDeposits ?? "0",
+      systemHealth: d.systemHealth ?? 100,
+      transactions: d.transactions ?? 0,
+      strand1Balance: d.strand1Balance ?? "0",
+      strand2Balance: d.strand2Balance ?? "0",
+      strand3Balance: d.strand3Balance ?? "0",
+    };
+  } catch {
+    return { totalMembers: 0, totalDeposits: "0", systemHealth: 100, transactions: 0, strand1Balance: "0", strand2Balance: "0", strand3Balance: "0" };
+  }
 }
 
 // Get AAVE lending rates
@@ -109,35 +189,25 @@ async function getMemberAllocation() {
 
 // Deposit amount (in ether) to vault contract
 async function depositToVault(amountEther) {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return false;
-  }
+  const existing = getTvcSession();
+  const token = existing?.session?.access_token || '';
+  const wallet = existing?.wallet?.address || null;
   try {
-    // Simulate deposit for demo purposes
-    console.log(`Depositing ${amountEther} to vault...`);
-    alert(`Demo mode: Automated deposit of ${amountEther} successful!`);
+    await tvcApi.deposit(amountEther, wallet, token);
     return true;
-  } catch (error) {
-    console.error("Deposit failed:", error);
-    alert("Deposit transaction failed.");
+  } catch {
     return false;
   }
 }
 
 // Harvest and route yields
 async function harvestAndRoute() {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return false;
-  }
+  const existing = getTvcSession();
+  const token = existing?.session?.access_token || '';
   try {
-    // Simulate harvest for demo purposes
-    alert("Demo mode: Harvest simulation successful!");
+    await tvcApi.harvest(token);
     return true;
-  } catch (error) {
-    console.error("Harvest failed:", error);
-    alert("Harvest transaction failed.");
+  } catch {
     return false;
   }
 }
@@ -205,6 +275,70 @@ const VaultClubWebsite = () => {
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostCategory, setNewPostCategory] = useState('General Discussion');
   const [showNewPostModal, setShowNewPostModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState('signup'); // 'signup' | 'login'
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
+
+  useEffect(() => {
+    const existing = getTvcSession();
+    if (existing?.session?.access_token) {
+      setWalletConnected(true);
+      const addr = existing?.wallet?.address || walletAddress;
+      setWalletAddress(addr);
+      if (addr) {
+        getVaultBalance(addr).then(setVaultBalance).catch(() => {});
+      }
+    }
+  }, []);
+
+  const openAuthFlow = (mode = 'signup') => {
+    setAuthMode(mode);
+    setAuthError('');
+    setShowAuthModal(true);
+  };
+
+  const closeAuthFlow = () => {
+    setShowAuthModal(false);
+    setAuthEmail('');
+    setAuthPassword('');
+    setAuthName('');
+    setAuthError('');
+  };
+
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      let data;
+      if (authMode === 'signup') {
+        await stSignup(authEmail.trim(), authPassword, authName.trim());
+        data = await stLogin(authEmail.trim(), authPassword);
+      } else {
+        data = await stLogin(authEmail.trim(), authPassword);
+      }
+
+      saveTvcSession(data);
+      if (data?.wallet?.address) {
+        setWalletConnected(true);
+        setWalletAddress(data.wallet.address);
+        try {
+          const bal = await getVaultBalance(data.wallet.address);
+          setVaultBalance(bal);
+        } catch {}
+      }
+      closeAuthFlow();
+    } catch (err) {
+      setAuthError(err?.message || 'Authentication failed');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
 
   // Handle URL-based contract joining
   useEffect(() => {
@@ -212,50 +346,47 @@ const VaultClubWebsite = () => {
     const joinContractId = urlParams.get('join');
     
     if (joinContractId && walletConnected) {
-      // Find the contract to join
-      const contractToJoin = deployedSubclubs.find(club => 
-        club.contractAddress === joinContractId && 
-        !club.isPrivate && 
-        club.currentMembers < club.maxMembers &&
-        (!club.members || !club.members.includes(walletAddress))
-      );
-      
-      if (contractToJoin) {
-        // Auto-join the contract
-        const updatedContract = {
-          ...contractToJoin,
-          currentMembers: contractToJoin.currentMembers + 1,
-          members: [...(contractToJoin.members || []), walletAddress]
-        };
-        
-        setDeployedSubclubs(prev => 
-          prev.map(club => 
-            club.contractAddress === joinContractId ? updatedContract : club
-          )
-        );
-        
-        alert(`✅ Successfully joined subclub contract!\n\n${contractToJoin.lockupPeriod} ${contractToJoin.isChargedContract ? 'Month' : 'Year'} Lockup • ${contractToJoin.rigorLevel.charAt(0).toUpperCase() + contractToJoin.rigorLevel.slice(1)} Rigor\n\nYou can now start making deposits according to the contract schedule.`);
-        
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } else if (joinContractId) {
-        // Contract not found, full, private, or user already a member
-        const existingContract = deployedSubclubs.find(club => club.contractAddress === joinContractId);
-        if (existingContract) {
-          if (existingContract.isPrivate) {
-            alert('❌ This is a private contract. You need a direct invitation from the contract owner.');
-          } else if (existingContract.currentMembers >= existingContract.maxMembers) {
-            alert('❌ This contract is full. No more members can join.');
-          } else if (existingContract.members && existingContract.members.includes(walletAddress)) {
-            alert('ℹ️ You are already a member of this contract.');
+      const existing = getTvcSession();
+      const token = existing?.session?.access_token || '';
+      const wallet = existing?.wallet?.address || null;
+
+      (async () => {
+        try {
+          await stJoinContract(
+            { contract_id: joinContractId, contribution_amount: 0, wallet_address: wallet },
+            token
+          );
+
+          const contractToJoin = deployedSubclubs.find(club => 
+            (String(club.id) === String(joinContractId) || club.contractAddress === joinContractId) && 
+            !club.isPrivate && 
+            club.currentMembers < club.maxMembers &&
+            (!club.members || !club.members.includes(walletAddress))
+          );
+          
+          if (contractToJoin) {
+            const updatedContract = {
+              ...contractToJoin,
+              currentMembers: contractToJoin.currentMembers + 1,
+              members: [...(contractToJoin.members || []), walletAddress]
+            };
+            
+            setDeployedSubclubs(prev => 
+              prev.map(club => 
+                (String(club.id) === String(joinContractId) || club.contractAddress === joinContractId) ? updatedContract : club
+              )
+            );
+            
+            alert(`✅ Successfully joined subclub contract!\n\n${contractToJoin.lockupPeriod} ${contractToJoin.isChargedContract ? 'Month' : 'Year'} Lockup • ${contractToJoin.rigorLevel.charAt(0).toUpperCase() + contractToJoin.rigorLevel.slice(1)} Rigor\n\nYou can now start making deposits according to the contract schedule.`);
+          } else {
+            alert('✅ Successfully joined subclub contract!');
           }
-        } else {
-          alert('❌ Contract not found. The link may be invalid or the contract may not be deployed yet.');
+        } catch (e) {
+          alert(e?.message || 'Failed to join the contract');
+        } finally {
+          window.history.replaceState({}, document.title, window.location.pathname);
         }
-        
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
+      })();
     }
   }, [walletConnected, walletAddress, deployedSubclubs]);
 
@@ -628,13 +759,7 @@ const VaultClubWebsite = () => {
   };
 
   const handleConnectWallet = async () => {
-    const address = await connectWallet();
-    if (address) {
-      setWalletConnected(true);
-      setWalletAddress(address);
-      const balance = await getVaultBalance(address);
-      setVaultBalance(balance);
-    }
+    openAuthFlow('signup');
   };
 
   const getContractColor = (subclub) => {
@@ -820,11 +945,7 @@ const VaultClubWebsite = () => {
       alert("Please connect your wallet first");
       return;
     }
-    
-    // Generate a realistic contract address
-    const contractAddress = `0x${Math.random().toString(16).substr(2, 40)}`;
-    
-    // Assign a random color when creating the contract
+
     const colors = [
       'border-yellow-500',   
       'border-green-500',   
@@ -836,37 +957,53 @@ const VaultClubWebsite = () => {
       'border-indigo-500'   
     ];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
-    
-    // Create new subclub object with assigned color
-    const newSubclub = {
-      id: Date.now(),
-      contractAddress,
-      creator: walletAddress,
-      maxMembers: clubCreationData.maxMembers,
-      lockupPeriod: clubCreationData.lockupPeriod,
-      rigorLevel: clubCreationData.rigorLevel,
-      isPrivate: clubCreationData.isPrivate,
-      isChargedContract: clubCreationData.isChargedContract,
-      currentMembers: 1, // Creator is first member
-      createdAt: new Date().toISOString(),
-      status: 'active',
-      totalDeposits: 0,
-      members: [walletAddress],
-      borderColor: randomColor, // Store the color with the contract
-      customWeeklyAmount: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customWeeklyAmount : undefined,
-      customSchedule: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customSchedule : undefined,
-      // Contract-specific strand balances
-      strand1Balance: "0",
-      strand2Balance: "0", 
-      strand3Balance: "0",
-      totalContractBalance: "0"
-    };
-    
-    // Add to deployed subclubs
-    setDeployedSubclubs(prev => [...prev, newSubclub]);
-    
-    // Success notification
-    alert(`✅ SubClub Contract Deployed Successfully!
+    const contractAddress = `0x${Math.random().toString(16).substr(2, 40)}`;
+
+    try {
+      const existing = getTvcSession();
+      const token = existing?.session?.access_token || '';
+
+      const created = await stCreateContract(
+        {
+          name: `Vault Club ${deployedSubclubs.length + 1}`,
+          description: `${clubCreationData.rigorLevel} rigor, ${clubCreationData.lockupPeriod}${clubCreationData.isChargedContract ? 'mo' : 'y'} lockup`,
+          target_amount: clubCreationData.customSchedule
+            ? clubCreationData.customSchedule.reduce((sum, s) => sum + (s.amount || 0), 0)
+            : (clubCreationData.customWeeklyAmount || 0) * 52,
+          minimum_contribution: clubCreationData.customWeeklyAmount || 0,
+          maximum_participants: clubCreationData.maxMembers,
+          start_date: new Date().toISOString(),
+          end_date: null,
+        },
+        token
+      );
+
+      const newSubclub = {
+        id: created.id,
+        contractAddress,
+        creator: walletAddress,
+        maxMembers: clubCreationData.maxMembers,
+        lockupPeriod: clubCreationData.lockupPeriod,
+        rigorLevel: clubCreationData.rigorLevel,
+        isPrivate: clubCreationData.isPrivate,
+        isChargedContract: clubCreationData.isChargedContract,
+        currentMembers: 1,
+        createdAt: created.created_at || new Date().toISOString(),
+        status: created.status || 'active',
+        totalDeposits: 0,
+        members: [walletAddress],
+        borderColor: randomColor,
+        customWeeklyAmount: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customWeeklyAmount : undefined,
+        customSchedule: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customSchedule : undefined,
+        strand1Balance: "0",
+        strand2Balance: "0", 
+        strand3Balance: "0",
+        totalContractBalance: "0"
+      };
+
+      setDeployedSubclubs(prev => [...prev, newSubclub]);
+
+      alert(`✅ SubClub Contract Deployed Successfully!
 
 Contract Address: ${contractAddress}
 Contract Type: ${clubCreationData.isChargedContract ? 'Charged Contract' : 'Traditional Contract'}
@@ -876,9 +1013,14 @@ Investment Rigor: ${clubCreationData.rigorLevel.charAt(0).toUpperCase() + clubCr
 Privacy: ${clubCreationData.isPrivate ? 'Private (invitation only)' : 'Public (visible to all)'}
 Utility Fee: ${clubCreationData.isChargedContract ? '$1.25' : '$1.00'}/user/week
 
+Invite Link: ${window.location.origin}?join=${created.id}
+
 Your subclub is now live and ready for members to join!`);
-    
-    setActiveModal(null);
+
+      setActiveModal(null);
+    } catch (e) {
+      alert(e?.message || "Failed to create contract");
+    }
   };
 
   const CreateClubModal = () => {    
@@ -2033,8 +2175,10 @@ Your subclub is now live and ready for members to join!`);
                             <button 
                               className="text-xs px-3 py-1 rounded-full transition-colors bg-green-500 hover:bg-green-600 text-white"
                               onClick={() => {
-                                // Join contract logic here
-                                alert(`Joining contract ${subclub.contractAddress.slice(0,8)}...`);
+                                const joinTarget = subclub.id ?? subclub.contractAddress;
+                                const url = new URL(window.location.href);
+                                url.searchParams.set('join', String(joinTarget));
+                                window.location.href = url.toString();
                               }}
                             >
                               Join
@@ -2076,31 +2220,75 @@ Your subclub is now live and ready for members to join!`);
     const filteredPosts = selectedForumCategory === 'All' 
       ? forumPosts 
       : forumPosts.filter(post => post.category === selectedForumCategory);
+    useEffect(() => {
+      let cancelled = false;
+      async function load() {
+        try {
+          const cat = selectedForumCategory === 'All' ? undefined : selectedForumCategory;
+          const rows = await tvcApi.forum.listPosts(cat);
+          if (cancelled) return;
+          const mapped = (rows || []).map((row) => ({
+            id: row.id,
+            title: row.title,
+            author: walletConnected && walletAddress ? `${walletAddress.slice(0,6)}...${walletAddress.slice(-4)}` : 'Anonymous',
+            timestamp: new Date(row.created_at || Date.now()).toLocaleString(),
+            category: row.category || 'General Discussion',
+            replies: 0,
+            likes: 0,
+            preview: (row.content || '').length > 100 ? String(row.content).substring(0, 100) + '...' : String(row.content || ''),
+            tags: [],
+            isSticky: false,
+          }));
+          setForumPosts(mapped);
+        } catch (e) {
+          // Keep silent to avoid UI regression; optionally show toast in future
+        }
+      }
+      load();
+      return () => {
+        cancelled = true;
+      };
+    }, [selectedForumCategory, walletConnected, walletAddress]);
 
-    const handleCreatePost = () => {
+    const handleCreatePost = async () => {
       if (!newPostTitle.trim() || !newPostContent.trim()) {
         alert('Please fill in both title and content');
         return;
       }
-
-      const newPost = {
-        id: forumPosts.length + 1,
-        title: newPostTitle,
-        author: walletConnected ? `${walletAddress?.slice(0,6)}...${walletAddress?.slice(-4)}` : 'Anonymous',
-        timestamp: 'Just now',
-        category: newPostCategory,
-        replies: 0,
-        likes: 0,
-        preview: newPostContent.length > 100 ? newPostContent.substring(0, 100) + '...' : newPostContent,
-        tags: ['New Post'],
-        isSticky: false
-      };
-
-      setForumPosts(prev => [newPost, ...prev]);
-      setNewPostTitle('');
-      setNewPostContent('');
-      setShowNewPostModal(false);
-      alert('Post created successfully!');
+      const existing = getTvcSession();
+      const token = existing?.session?.access_token || '';
+      if (!token) {
+        alert('Please sign in to create a post.');
+        return;
+      }
+      try {
+        await tvcApi.forum.createPost(
+          { title: newPostTitle.trim(), content: newPostContent.trim(), category: newPostCategory },
+          token
+        );
+        // Refetch posts after successful creation
+        const cat = selectedForumCategory === 'All' ? undefined : selectedForumCategory;
+        const rows = await tvcApi.forum.listPosts(cat);
+        const mapped = (rows || []).map((row) => ({
+          id: row.id,
+          title: row.title,
+          author: walletConnected && walletAddress ? `${walletAddress.slice(0,6)}...${walletAddress.slice(-4)}` : 'Anonymous',
+          timestamp: new Date(row.created_at || Date.now()).toLocaleString(),
+          category: row.category || 'General Discussion',
+          replies: 0,
+          likes: 0,
+          preview: (row.content || '').length > 100 ? String(row.content).substring(0, 100) + '...' : String(row.content || ''),
+          tags: [],
+          isSticky: false,
+        }));
+        setForumPosts(mapped);
+        setNewPostTitle('');
+        setNewPostContent('');
+        setShowNewPostModal(false);
+        alert('Post created successfully!');
+      } catch (e) {
+        alert(`Failed to create post: ${e?.message || e}`);
+      }
     };
 
     return (
@@ -2998,6 +3186,109 @@ Your subclub is now live and ready for members to join!`);
         {currentPage === 'simulation' && <FutureSimulationPage />}
       </main>
 
+      {showAuthModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-xl font-bold">
+                    {authMode === 'signup' ? 'Create Your Account' : 'Sign In'}
+                  </h3>
+                  <p className="text-white/80">
+                    {authMode === 'signup' ? 'Join The Vault Club and get your wallet' : 'Access your account'}
+                  </p>
+                </div>
+                <button onClick={closeAuthFlow} className="text-white/80 hover:text-white">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleAuthSubmit} className="p-6 space-y-4">
+              {authError && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                  {authError}
+                </div>
+              )}
+
+              {authMode === 'signup' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                  <input
+                    type="text"
+                    value={authName}
+                    onChange={(e) => setAuthName(e.target.value)}
+                    placeholder="Your name"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  required
+                />
+              </div>
+
+              <div className="flex space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeAuthFlow}
+                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={authLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={`flex-1 px-4 py-3 text-white rounded-lg transition-colors ${authMode === 'signup' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-purple-600 hover:bg-purple-700'}`}
+                  disabled={authLoading}
+                >
+                  {authLoading ? 'Please wait…' : authMode === 'signup' ? 'Create Account' : 'Sign In'}
+                </button>
+              </div>
+
+              <div className="text-sm text-center text-slate-600">
+                {authMode === 'signup' ? (
+                  <>
+                    Already have an account?{' '}
+                    <button type="button" className="text-indigo-600 hover:underline" onClick={() => setAuthMode('login')}>
+                      Sign in
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    New here?{' '}
+                    <button type="button" className="text-indigo-600 hover:underline" onClick={() => setAuthMode('signup')}>
+                      Create an account
+                    </button>
+                  </>
+                )}
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {/* Strand Modal */}
       {activeStrand && (
         <StrandModal strand={activeStrand} onClose={closeModal} />

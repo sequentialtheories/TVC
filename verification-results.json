@@ -1,0 +1,53 @@
+{
+  "verified": [],
+  "failed": [
+    {
+      "name": "MockAavePool",
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
+    },
+    {
+      "name": "MockQuickSwapRouter",
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
+    },
+    {
+      "name": "MockWBTC",
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
+    },
+    {
+      "name": "EmergencyModule",
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
+    },
+    {
+      "name": "MegaVaultFactory",
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
+    },
+    {
+      "name": "StrandManagerCapital",
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
+    },
+    {
+      "name": "StrandManagerYield",
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
+    },
+    {
+      "name": "StrandManagerMomentum",
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
+    },
+    {
+      "name": "RRLEngine",
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
+    },
+    {
+      "name": "BTCAccumulator",
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
+    },
+    {
+      "name": "SubscriptionLender",
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
+    },
+    {
+      "name": "MegaVault",
+      "error": "Trying to verify a contract in a network with chain id 31337, but the plugin doesn't recognize it as a supported chain.\n\nYou can manually add support for it by following these instructions: https://hardhat.org/verify-custom-networks\n\nTo see the list of supported networks, run this command:\n\n  npx hardhat verify --list-networks"
+    }
+  ]
+}

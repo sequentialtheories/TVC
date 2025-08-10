@@ -12,6 +12,60 @@ const VAULT_CONTRACT_ABI = [
   "function getVaultStats() view returns (uint256, uint256, uint256, uint256)",
   // Add other contract functions as needed
 ];
+const ST_FUNCTIONS_BASE = (window && window.__TVC_CONFIG && window.__TVC_CONFIG.functionsBase) || '';
+const ST_VAULT_CLUB_API_KEY = (window && window.__TVC_CONFIG && window.__TVC_CONFIG.vaultClubApiKey) || '';
+
+async function stSignup(email, password, name) {
+  if (!ST_FUNCTIONS_BASE) throw new Error('Missing Sequence Theory functions base URL');
+  const res = await fetch(`${ST_FUNCTIONS_BASE}/vault-club-user-creation`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-vault-club-api-key': ST_VAULT_CLUB_API_KEY || '',
+    },
+    body: JSON.stringify({ email, password, name }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data?.success) {
+    throw new Error(data?.error || 'Signup failed');
+  }
+  return data.data;
+}
+
+async function stLogin(email, password) {
+  if (!ST_FUNCTIONS_BASE) throw new Error('Missing Sequence Theory functions base URL');
+  const res = await fetch(`${ST_FUNCTIONS_BASE}/vault-club-auth-sync`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-vault-club-api-key': ST_VAULT_CLUB_API_KEY || '',
+    },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data?.success) {
+    throw new Error(data?.error || 'Login failed');
+  }
+  return data.data;
+}
+
+function saveTvcSession(session) {
+  try {
+    localStorage.setItem('tvc.auth', JSON.stringify(session));
+  } catch {}
+}
+
+function getTvcSession() {
+  try {
+    const raw = localStorage.getItem('tvc.auth');
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+
 
 // Connect wallet and return address or null
 async function connectWallet() {
@@ -205,6 +259,62 @@ const VaultClubWebsite = () => {
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostCategory, setNewPostCategory] = useState('General Discussion');
   const [showNewPostModal, setShowNewPostModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState('signup'); // 'signup' | 'login'
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
+
+  useEffect(() => {
+    const existing = getTvcSession();
+    if (existing?.session?.access_token) {
+      setWalletConnected(true);
+      setWalletAddress(existing?.wallet?.address || walletAddress);
+    }
+  }, []);
+
+  const openAuthFlow = (mode = 'signup') => {
+    setAuthMode(mode);
+    setAuthError('');
+    setShowAuthModal(true);
+  };
+
+  const closeAuthFlow = () => {
+    setShowAuthModal(false);
+    setAuthEmail('');
+    setAuthPassword('');
+    setAuthName('');
+    setAuthError('');
+  };
+
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      let data;
+      if (authMode === 'signup') {
+        await stSignup(authEmail.trim(), authPassword, authName.trim());
+        data = await stLogin(authEmail.trim(), authPassword);
+      } else {
+        data = await stLogin(authEmail.trim(), authPassword);
+      }
+
+      saveTvcSession(data);
+      if (data?.wallet?.address) {
+        setWalletConnected(true);
+        setWalletAddress(data.wallet.address);
+      }
+      closeAuthFlow();
+    } catch (err) {
+      setAuthError(err?.message || 'Authentication failed');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
 
   // Handle URL-based contract joining
   useEffect(() => {
@@ -628,13 +738,7 @@ const VaultClubWebsite = () => {
   };
 
   const handleConnectWallet = async () => {
-    const address = await connectWallet();
-    if (address) {
-      setWalletConnected(true);
-      setWalletAddress(address);
-      const balance = await getVaultBalance(address);
-      setVaultBalance(balance);
-    }
+    openAuthFlow('signup');
   };
 
   const getContractColor = (subclub) => {
@@ -2998,6 +3102,109 @@ Your subclub is now live and ready for members to join!`);
         {currentPage === 'simulation' && <FutureSimulationPage />}
       </main>
 
+      {showAuthModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 text-white">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-xl font-bold">
+                    {authMode === 'signup' ? 'Create Your Account' : 'Sign In'}
+                  </h3>
+                  <p className="text-white/80">
+                    {authMode === 'signup' ? 'Join The Vault Club and get your wallet' : 'Access your account'}
+                  </p>
+                </div>
+                <button onClick={closeAuthFlow} className="text-white/80 hover:text-white">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleAuthSubmit} className="p-6 space-y-4">
+              {authError && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                  {authError}
+                </div>
+              )}
+
+              {authMode === 'signup' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                  <input
+                    type="text"
+                    value={authName}
+                    onChange={(e) => setAuthName(e.target.value)}
+                    placeholder="Your name"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  required
+                />
+              </div>
+
+              <div className="flex space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeAuthFlow}
+                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={authLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={`flex-1 px-4 py-3 text-white rounded-lg transition-colors ${authMode === 'signup' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-purple-600 hover:bg-purple-700'}`}
+                  disabled={authLoading}
+                >
+                  {authLoading ? 'Please wait…' : authMode === 'signup' ? 'Create Account' : 'Sign In'}
+                </button>
+              </div>
+
+              <div className="text-sm text-center text-slate-600">
+                {authMode === 'signup' ? (
+                  <>
+                    Already have an account?{' '}
+                    <button type="button" className="text-indigo-600 hover:underline" onClick={() => setAuthMode('login')}>
+                      Sign in
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    New here?{' '}
+                    <button type="button" className="text-indigo-600 hover:underline" onClick={() => setAuthMode('signup')}>
+                      Create an account
+                    </button>
+                  </>
+                )}
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {/* Strand Modal */}
       {activeStrand && (
         <StrandModal strand={activeStrand} onClose={closeModal} />

@@ -19,66 +19,53 @@ const tvcHeaders = (token) => ({
   'x-vault-club-api-key': ST_VAULT_CLUB_API_KEY || '',
   ...(token ? { Authorization: `Bearer ${token}` } : {})
 });
+const tvcApi = (() => {
+  const base = ST_FUNCTIONS_BASE;
+  const key = ST_VAULT_CLUB_API_KEY;
+  const headers = (token) => ({ 'Content-Type': 'application/json', 'x-vault-club-api-key': key || '', ...(token ? { Authorization: `Bearer ${token}` } : {}) });
+  async function req(path, init = {}, token) {
+    if (!base) throw new Error('Missing Sequence Theory functions base URL');
+    const method = (init.method || 'GET').toUpperCase();
+    const defaultIdk = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const h = { ...(init.headers || {}), ...headers(token) };
+    if (method === 'POST' && !('Idempotency-Key' in h)) h['Idempotency-Key'] = defaultIdk;
+    const res = await fetch(`${base}${path}`, { ...init, headers: h });
+    let json = null;
+    try { json = await res.json(); } catch { json = null; }
+    if (!res.ok || !(json && json.success)) throw new Error((json && json.error) || `HTTP ${res.status}`);
+    return json.data;
+  }
+  return {
+    signup: (email, password, name) => req('/vault-club-user-creation', { method: 'POST', body: JSON.stringify({ email, password, name }) }),
+    login: (email, password) => req('/vault-club-auth-sync', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    createContract: (payload, token) => req('/vault-club-contract-create', { method: 'POST', body: JSON.stringify(payload) }, token),
+    joinContract: (payload, token) => req('/vault-club-contract-join', { method: 'POST', body: JSON.stringify(payload) }, token),
+    getBalance: (wallet) => req(`/vault-club-balance?wallet=${encodeURIComponent(wallet)}`, { method: 'GET' }),
+    getStats: () => req('/vault-club-stats', { method: 'GET' }),
+    deposit: (amount, wallet, token) => req('/vault-club-deposit', { method: 'POST', body: JSON.stringify({ amount: String(amount), wallet_address: wallet }) }, token),
+    harvest: (token) => req('/vault-club-harvest', { method: 'POST', body: JSON.stringify({}) }, token),
+    forum: {
+      listPosts: (category) => req(`/forum-post-list${category ? `?category=${encodeURIComponent(category)}` : ''}`, { method: 'GET' }),
+      createPost: (post, token) => req('/forum-post-create', { method: 'POST', body: JSON.stringify(post) }, token),
+      listReplies: (postId) => req(`/forum-reply-list?post_id=${encodeURIComponent(postId)}`, { method: 'GET' }),
+      createReply: (reply, token) => req('/forum-reply-create', { method: 'POST', body: JSON.stringify(reply) }, token),
+    },
+  };
+})();
 
 async function stSignup(email, password, name) {
-  if (!ST_FUNCTIONS_BASE) throw new Error('Missing Sequence Theory functions base URL');
-  const res = await fetch(`${ST_FUNCTIONS_BASE}/vault-club-user-creation`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-vault-club-api-key': ST_VAULT_CLUB_API_KEY || '',
-    },
-    body: JSON.stringify({ email, password, name }),
-  });
-  const data = await res.json();
-  if (!res.ok || !data?.success) {
-    throw new Error(data?.error || 'Signup failed');
-  }
-  return data.data;
+  return tvcApi.signup(email, password, name);
 }
 
 async function stLogin(email, password) {
-  if (!ST_FUNCTIONS_BASE) throw new Error('Missing Sequence Theory functions base URL');
-  const res = await fetch(`${ST_FUNCTIONS_BASE}/vault-club-auth-sync`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-vault-club-api-key': ST_VAULT_CLUB_API_KEY || '',
-    },
-    body: JSON.stringify({ email, password }),
-  });
-  const data = await res.json();
+  return tvcApi.login(email, password);
+}
 async function stCreateContract(payload, token) {
-  if (!ST_FUNCTIONS_BASE) throw new Error('Missing Sequence Theory functions base URL');
-  const res = await fetch(`${ST_FUNCTIONS_BASE}/vault-club-contract-create`, {
-    method: 'POST',
-    headers: tvcHeaders(token),
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json();
-  if (!res.ok || !data?.success) {
-    throw new Error(data?.error || 'Create contract failed');
-  }
-  return data.data;
+  return tvcApi.createContract(payload, token);
 }
 
 async function stJoinContract(payload, token) {
-  if (!ST_FUNCTIONS_BASE) throw new Error('Missing Sequence Theory functions base URL');
-  const res = await fetch(`${ST_FUNCTIONS_BASE}/vault-club-contract-join`, {
-    method: 'POST',
-    headers: tvcHeaders(token),
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json();
-  if (!res.ok || !data?.success) {
-    throw new Error(data?.error || 'Join contract failed');
-  }
-  return data.data;
-}
-  if (!res.ok || !data?.success) {
-    throw new Error(data?.error || 'Login failed');
-  }
-  return data.data;
+  return tvcApi.joinContract(payload, token);
 }
 
 function saveTvcSession(session) {
@@ -114,47 +101,32 @@ async function connectWallet() {
   }
 }
 
-// Get vault balance for address - fallback version without ethers dependency
+// Get vault balance for address - via SDK
 async function getVaultBalance(address) {
-  if (!ST_FUNCTIONS_BASE) return "0";
   try {
-    const res = await fetch(`${ST_FUNCTIONS_BASE}/vault-club-balance?wallet=${encodeURIComponent(address)}`, {
-      method: 'GET',
-      headers: tvcHeaders(),
-    });
-    const data = await res.json();
-    if (res.ok && data?.success) {
-      return String(data.data?.balance ?? "0");
-    }
-  } catch {}
-  return "0";
+    const data = await tvcApi.getBalance(address);
+    return String((data && data.balance) || "0");
+  } catch {
+    return "0";
+  }
 }
 
-// Get vault stats from contract - fallback version
+// Get vault stats from contract - via SDK
 async function getVaultStats() {
-  if (!ST_FUNCTIONS_BASE) {
+  try {
+    const d = await tvcApi.getStats();
+    return {
+      totalMembers: d.totalMembers ?? 0,
+      totalDeposits: d.totalDeposits ?? "0",
+      systemHealth: d.systemHealth ?? 100,
+      transactions: d.transactions ?? 0,
+      strand1Balance: d.strand1Balance ?? "0",
+      strand2Balance: d.strand2Balance ?? "0",
+      strand3Balance: d.strand3Balance ?? "0",
+    };
+  } catch {
     return { totalMembers: 0, totalDeposits: "0", systemHealth: 100, transactions: 0, strand1Balance: "0", strand2Balance: "0", strand3Balance: "0" };
   }
-  try {
-    const res = await fetch(`${ST_FUNCTIONS_BASE}/vault-club-stats`, {
-      method: 'GET',
-      headers: tvcHeaders(),
-    });
-    const data = await res.json();
-    if (res.ok && data?.success) {
-      const d = data.data || {};
-      return {
-        totalMembers: d.totalMembers ?? 0,
-        totalDeposits: d.totalDeposits ?? "0",
-        systemHealth: d.systemHealth ?? 100,
-        transactions: d.transactions ?? 0,
-        strand1Balance: d.strand1Balance ?? "0",
-        strand2Balance: d.strand2Balance ?? "0",
-        strand3Balance: d.strand3Balance ?? "0",
-      };
-    }
-  } catch {}
-  return { totalMembers: 0, totalDeposits: "0", systemHealth: 100, transactions: 0, strand1Balance: "0", strand2Balance: "0", strand3Balance: "0" };
 }
 
 // Get AAVE lending rates
@@ -220,15 +192,9 @@ async function depositToVault(amountEther) {
   const existing = getTvcSession();
   const token = existing?.session?.access_token || '';
   const wallet = existing?.wallet?.address || null;
-  if (!ST_FUNCTIONS_BASE) return false;
   try {
-    const res = await fetch(`${ST_FUNCTIONS_BASE}/vault-club-deposit`, {
-      method: 'POST',
-      headers: tvcHeaders(token),
-      body: JSON.stringify({ amount: String(amountEther), wallet_address: wallet }),
-    });
-    const data = await res.json();
-    return !!(res.ok && data?.success);
+    await tvcApi.deposit(amountEther, wallet, token);
+    return true;
   } catch {
     return false;
   }
@@ -238,15 +204,9 @@ async function depositToVault(amountEther) {
 async function harvestAndRoute() {
   const existing = getTvcSession();
   const token = existing?.session?.access_token || '';
-  if (!ST_FUNCTIONS_BASE) return false;
   try {
-    const res = await fetch(`${ST_FUNCTIONS_BASE}/vault-club-harvest`, {
-      method: 'POST',
-      headers: tvcHeaders(token),
-      body: JSON.stringify({}),
-    });
-    const data = await res.json();
-    return !!(res.ok && data?.success);
+    await tvcApi.harvest(token);
+    return true;
   } catch {
     return false;
   }

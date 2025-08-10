@@ -2218,31 +2218,75 @@ Your subclub is now live and ready for members to join!`);
     const filteredPosts = selectedForumCategory === 'All' 
       ? forumPosts 
       : forumPosts.filter(post => post.category === selectedForumCategory);
+    useEffect(() => {
+      let cancelled = false;
+      async function load() {
+        try {
+          const cat = selectedForumCategory === 'All' ? undefined : selectedForumCategory;
+          const rows = await tvcApi.forum.listPosts(cat);
+          if (cancelled) return;
+          const mapped = (rows || []).map((row) => ({
+            id: row.id,
+            title: row.title,
+            author: walletConnected && walletAddress ? `${walletAddress.slice(0,6)}...${walletAddress.slice(-4)}` : 'Anonymous',
+            timestamp: new Date(row.created_at || Date.now()).toLocaleString(),
+            category: row.category || 'General Discussion',
+            replies: 0,
+            likes: 0,
+            preview: (row.content || '').length > 100 ? String(row.content).substring(0, 100) + '...' : String(row.content || ''),
+            tags: [],
+            isSticky: false,
+          }));
+          setForumPosts(mapped);
+        } catch (e) {
+          // Keep silent to avoid UI regression; optionally show toast in future
+        }
+      }
+      load();
+      return () => {
+        cancelled = true;
+      };
+    }, [selectedForumCategory, walletConnected, walletAddress]);
 
-    const handleCreatePost = () => {
+    const handleCreatePost = async () => {
       if (!newPostTitle.trim() || !newPostContent.trim()) {
         alert('Please fill in both title and content');
         return;
       }
-
-      const newPost = {
-        id: forumPosts.length + 1,
-        title: newPostTitle,
-        author: walletConnected ? `${walletAddress?.slice(0,6)}...${walletAddress?.slice(-4)}` : 'Anonymous',
-        timestamp: 'Just now',
-        category: newPostCategory,
-        replies: 0,
-        likes: 0,
-        preview: newPostContent.length > 100 ? newPostContent.substring(0, 100) + '...' : newPostContent,
-        tags: ['New Post'],
-        isSticky: false
-      };
-
-      setForumPosts(prev => [newPost, ...prev]);
-      setNewPostTitle('');
-      setNewPostContent('');
-      setShowNewPostModal(false);
-      alert('Post created successfully!');
+      const existing = getTvcSession();
+      const token = existing?.session?.access_token || '';
+      if (!token) {
+        alert('Please sign in to create a post.');
+        return;
+      }
+      try {
+        await tvcApi.forum.createPost(
+          { title: newPostTitle.trim(), content: newPostContent.trim(), category: newPostCategory },
+          token
+        );
+        // Refetch posts after successful creation
+        const cat = selectedForumCategory === 'All' ? undefined : selectedForumCategory;
+        const rows = await tvcApi.forum.listPosts(cat);
+        const mapped = (rows || []).map((row) => ({
+          id: row.id,
+          title: row.title,
+          author: walletConnected && walletAddress ? `${walletAddress.slice(0,6)}...${walletAddress.slice(-4)}` : 'Anonymous',
+          timestamp: new Date(row.created_at || Date.now()).toLocaleString(),
+          category: row.category || 'General Discussion',
+          replies: 0,
+          likes: 0,
+          preview: (row.content || '').length > 100 ? String(row.content).substring(0, 100) + '...' : String(row.content || ''),
+          tags: [],
+          isSticky: false,
+        }));
+        setForumPosts(mapped);
+        setNewPostTitle('');
+        setNewPostContent('');
+        setShowNewPostModal(false);
+        alert('Post created successfully!');
+      } catch (e) {
+        alert(`Failed to create post: ${e?.message || e}`);
+      }
     };
 
     return (

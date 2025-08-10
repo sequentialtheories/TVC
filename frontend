@@ -14,6 +14,11 @@ const VAULT_CONTRACT_ABI = [
 ];
 const ST_FUNCTIONS_BASE = (window && window.__TVC_CONFIG && window.__TVC_CONFIG.functionsBase) || '';
 const ST_VAULT_CLUB_API_KEY = (window && window.__TVC_CONFIG && window.__TVC_CONFIG.vaultClubApiKey) || '';
+const tvcHeaders = (token) => ({
+  'Content-Type': 'application/json',
+  'x-vault-club-api-key': ST_VAULT_CLUB_API_KEY || '',
+  ...(token ? { Authorization: `Bearer ${token}` } : {})
+});
 
 async function stSignup(email, password, name) {
   if (!ST_FUNCTIONS_BASE) throw new Error('Missing Sequence Theory functions base URL');
@@ -43,6 +48,33 @@ async function stLogin(email, password) {
     body: JSON.stringify({ email, password }),
   });
   const data = await res.json();
+async function stCreateContract(payload, token) {
+  if (!ST_FUNCTIONS_BASE) throw new Error('Missing Sequence Theory functions base URL');
+  const res = await fetch(`${ST_FUNCTIONS_BASE}/vault-club-contract-create`, {
+    method: 'POST',
+    headers: tvcHeaders(token),
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok || !data?.success) {
+    throw new Error(data?.error || 'Create contract failed');
+  }
+  return data.data;
+}
+
+async function stJoinContract(payload, token) {
+  if (!ST_FUNCTIONS_BASE) throw new Error('Missing Sequence Theory functions base URL');
+  const res = await fetch(`${ST_FUNCTIONS_BASE}/vault-club-contract-join`, {
+    method: 'POST',
+    headers: tvcHeaders(token),
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok || !data?.success) {
+    throw new Error(data?.error || 'Join contract failed');
+  }
+  return data.data;
+}
   if (!res.ok || !data?.success) {
     throw new Error(data?.error || 'Login failed');
   }
@@ -84,23 +116,45 @@ async function connectWallet() {
 
 // Get vault balance for address - fallback version without ethers dependency
 async function getVaultBalance(address) {
-  // Since ethers may not be available, return mock data for now
-  // In production, implement proper Web3 calls
+  if (!ST_FUNCTIONS_BASE) return "0";
+  try {
+    const res = await fetch(`${ST_FUNCTIONS_BASE}/vault-club-balance?wallet=${encodeURIComponent(address)}`, {
+      method: 'GET',
+      headers: tvcHeaders(),
+    });
+    const data = await res.json();
+    if (res.ok && data?.success) {
+      return String(data.data?.balance ?? "0");
+    }
+  } catch {}
   return "0";
 }
 
 // Get vault stats from contract - fallback version
 async function getVaultStats() {
-  // Return consistent mock data - if no real deposits, vault should be empty
-  return { 
-    totalMembers: 0, 
-    totalDeposits: "0", 
-    systemHealth: 100, 
-    transactions: 0,
-    strand1Balance: "0",
-    strand2Balance: "0",
-    strand3Balance: "0" 
-  };
+  if (!ST_FUNCTIONS_BASE) {
+    return { totalMembers: 0, totalDeposits: "0", systemHealth: 100, transactions: 0, strand1Balance: "0", strand2Balance: "0", strand3Balance: "0" };
+  }
+  try {
+    const res = await fetch(`${ST_FUNCTIONS_BASE}/vault-club-stats`, {
+      method: 'GET',
+      headers: tvcHeaders(),
+    });
+    const data = await res.json();
+    if (res.ok && data?.success) {
+      const d = data.data || {};
+      return {
+        totalMembers: d.totalMembers ?? 0,
+        totalDeposits: d.totalDeposits ?? "0",
+        systemHealth: d.systemHealth ?? 100,
+        transactions: d.transactions ?? 0,
+        strand1Balance: d.strand1Balance ?? "0",
+        strand2Balance: d.strand2Balance ?? "0",
+        strand3Balance: d.strand3Balance ?? "0",
+      };
+    }
+  } catch {}
+  return { totalMembers: 0, totalDeposits: "0", systemHealth: 100, transactions: 0, strand1Balance: "0", strand2Balance: "0", strand3Balance: "0" };
 }
 
 // Get AAVE lending rates
@@ -163,35 +217,37 @@ async function getMemberAllocation() {
 
 // Deposit amount (in ether) to vault contract
 async function depositToVault(amountEther) {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return false;
-  }
+  const existing = getTvcSession();
+  const token = existing?.session?.access_token || '';
+  const wallet = existing?.wallet?.address || null;
+  if (!ST_FUNCTIONS_BASE) return false;
   try {
-    // Simulate deposit for demo purposes
-    console.log(`Depositing ${amountEther} to vault...`);
-    alert(`Demo mode: Automated deposit of ${amountEther} successful!`);
-    return true;
-  } catch (error) {
-    console.error("Deposit failed:", error);
-    alert("Deposit transaction failed.");
+    const res = await fetch(`${ST_FUNCTIONS_BASE}/vault-club-deposit`, {
+      method: 'POST',
+      headers: tvcHeaders(token),
+      body: JSON.stringify({ amount: String(amountEther), wallet_address: wallet }),
+    });
+    const data = await res.json();
+    return !!(res.ok && data?.success);
+  } catch {
     return false;
   }
 }
 
 // Harvest and route yields
 async function harvestAndRoute() {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return false;
-  }
+  const existing = getTvcSession();
+  const token = existing?.session?.access_token || '';
+  if (!ST_FUNCTIONS_BASE) return false;
   try {
-    // Simulate harvest for demo purposes
-    alert("Demo mode: Harvest simulation successful!");
-    return true;
-  } catch (error) {
-    console.error("Harvest failed:", error);
-    alert("Harvest transaction failed.");
+    const res = await fetch(`${ST_FUNCTIONS_BASE}/vault-club-harvest`, {
+      method: 'POST',
+      headers: tvcHeaders(token),
+      body: JSON.stringify({}),
+    });
+    const data = await res.json();
+    return !!(res.ok && data?.success);
+  } catch {
     return false;
   }
 }
@@ -330,50 +386,47 @@ const VaultClubWebsite = () => {
     const joinContractId = urlParams.get('join');
     
     if (joinContractId && walletConnected) {
-      // Find the contract to join
-      const contractToJoin = deployedSubclubs.find(club => 
-        club.contractAddress === joinContractId && 
-        !club.isPrivate && 
-        club.currentMembers < club.maxMembers &&
-        (!club.members || !club.members.includes(walletAddress))
-      );
-      
-      if (contractToJoin) {
-        // Auto-join the contract
-        const updatedContract = {
-          ...contractToJoin,
-          currentMembers: contractToJoin.currentMembers + 1,
-          members: [...(contractToJoin.members || []), walletAddress]
-        };
-        
-        setDeployedSubclubs(prev => 
-          prev.map(club => 
-            club.contractAddress === joinContractId ? updatedContract : club
-          )
-        );
-        
-        alert(`✅ Successfully joined subclub contract!\n\n${contractToJoin.lockupPeriod} ${contractToJoin.isChargedContract ? 'Month' : 'Year'} Lockup • ${contractToJoin.rigorLevel.charAt(0).toUpperCase() + contractToJoin.rigorLevel.slice(1)} Rigor\n\nYou can now start making deposits according to the contract schedule.`);
-        
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } else if (joinContractId) {
-        // Contract not found, full, private, or user already a member
-        const existingContract = deployedSubclubs.find(club => club.contractAddress === joinContractId);
-        if (existingContract) {
-          if (existingContract.isPrivate) {
-            alert('❌ This is a private contract. You need a direct invitation from the contract owner.');
-          } else if (existingContract.currentMembers >= existingContract.maxMembers) {
-            alert('❌ This contract is full. No more members can join.');
-          } else if (existingContract.members && existingContract.members.includes(walletAddress)) {
-            alert('ℹ️ You are already a member of this contract.');
+      const existing = getTvcSession();
+      const token = existing?.session?.access_token || '';
+      const wallet = existing?.wallet?.address || null;
+
+      (async () => {
+        try {
+          await stJoinContract(
+            { contract_id: joinContractId, contribution_amount: 0, wallet_address: wallet },
+            token
+          );
+
+          const contractToJoin = deployedSubclubs.find(club => 
+            (String(club.id) === String(joinContractId) || club.contractAddress === joinContractId) && 
+            !club.isPrivate && 
+            club.currentMembers < club.maxMembers &&
+            (!club.members || !club.members.includes(walletAddress))
+          );
+          
+          if (contractToJoin) {
+            const updatedContract = {
+              ...contractToJoin,
+              currentMembers: contractToJoin.currentMembers + 1,
+              members: [...(contractToJoin.members || []), walletAddress]
+            };
+            
+            setDeployedSubclubs(prev => 
+              prev.map(club => 
+                (String(club.id) === String(joinContractId) || club.contractAddress === joinContractId) ? updatedContract : club
+              )
+            );
+            
+            alert(`✅ Successfully joined subclub contract!\n\n${contractToJoin.lockupPeriod} ${contractToJoin.isChargedContract ? 'Month' : 'Year'} Lockup • ${contractToJoin.rigorLevel.charAt(0).toUpperCase() + contractToJoin.rigorLevel.slice(1)} Rigor\n\nYou can now start making deposits according to the contract schedule.`);
+          } else {
+            alert('✅ Successfully joined subclub contract!');
           }
-        } else {
-          alert('❌ Contract not found. The link may be invalid or the contract may not be deployed yet.');
+        } catch (e) {
+          alert(e?.message || 'Failed to join the contract');
+        } finally {
+          window.history.replaceState({}, document.title, window.location.pathname);
         }
-        
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
+      })();
     }
   }, [walletConnected, walletAddress, deployedSubclubs]);
 
@@ -932,11 +985,7 @@ const VaultClubWebsite = () => {
       alert("Please connect your wallet first");
       return;
     }
-    
-    // Generate a realistic contract address
-    const contractAddress = `0x${Math.random().toString(16).substr(2, 40)}`;
-    
-    // Assign a random color when creating the contract
+
     const colors = [
       'border-yellow-500',   
       'border-green-500',   
@@ -948,37 +997,53 @@ const VaultClubWebsite = () => {
       'border-indigo-500'   
     ];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
-    
-    // Create new subclub object with assigned color
-    const newSubclub = {
-      id: Date.now(),
-      contractAddress,
-      creator: walletAddress,
-      maxMembers: clubCreationData.maxMembers,
-      lockupPeriod: clubCreationData.lockupPeriod,
-      rigorLevel: clubCreationData.rigorLevel,
-      isPrivate: clubCreationData.isPrivate,
-      isChargedContract: clubCreationData.isChargedContract,
-      currentMembers: 1, // Creator is first member
-      createdAt: new Date().toISOString(),
-      status: 'active',
-      totalDeposits: 0,
-      members: [walletAddress],
-      borderColor: randomColor, // Store the color with the contract
-      customWeeklyAmount: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customWeeklyAmount : undefined,
-      customSchedule: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customSchedule : undefined,
-      // Contract-specific strand balances
-      strand1Balance: "0",
-      strand2Balance: "0", 
-      strand3Balance: "0",
-      totalContractBalance: "0"
-    };
-    
-    // Add to deployed subclubs
-    setDeployedSubclubs(prev => [...prev, newSubclub]);
-    
-    // Success notification
-    alert(`✅ SubClub Contract Deployed Successfully!
+    const contractAddress = `0x${Math.random().toString(16).substr(2, 40)}`;
+
+    try {
+      const existing = getTvcSession();
+      const token = existing?.session?.access_token || '';
+
+      const created = await stCreateContract(
+        {
+          name: `Vault Club ${deployedSubclubs.length + 1}`,
+          description: `${clubCreationData.rigorLevel} rigor, ${clubCreationData.lockupPeriod}${clubCreationData.isChargedContract ? 'mo' : 'y'} lockup`,
+          target_amount: clubCreationData.customSchedule
+            ? clubCreationData.customSchedule.reduce((sum, s) => sum + (s.amount || 0), 0)
+            : (clubCreationData.customWeeklyAmount || 0) * 52,
+          minimum_contribution: clubCreationData.customWeeklyAmount || 0,
+          maximum_participants: clubCreationData.maxMembers,
+          start_date: new Date().toISOString(),
+          end_date: null,
+        },
+        token
+      );
+
+      const newSubclub = {
+        id: created.id,
+        contractAddress,
+        creator: walletAddress,
+        maxMembers: clubCreationData.maxMembers,
+        lockupPeriod: clubCreationData.lockupPeriod,
+        rigorLevel: clubCreationData.rigorLevel,
+        isPrivate: clubCreationData.isPrivate,
+        isChargedContract: clubCreationData.isChargedContract,
+        currentMembers: 1,
+        createdAt: created.created_at || new Date().toISOString(),
+        status: created.status || 'active',
+        totalDeposits: 0,
+        members: [walletAddress],
+        borderColor: randomColor,
+        customWeeklyAmount: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customWeeklyAmount : undefined,
+        customSchedule: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customSchedule : undefined,
+        strand1Balance: "0",
+        strand2Balance: "0", 
+        strand3Balance: "0",
+        totalContractBalance: "0"
+      };
+
+      setDeployedSubclubs(prev => [...prev, newSubclub]);
+
+      alert(`✅ SubClub Contract Deployed Successfully!
 
 Contract Address: ${contractAddress}
 Contract Type: ${clubCreationData.isChargedContract ? 'Charged Contract' : 'Traditional Contract'}
@@ -988,9 +1053,14 @@ Investment Rigor: ${clubCreationData.rigorLevel.charAt(0).toUpperCase() + clubCr
 Privacy: ${clubCreationData.isPrivate ? 'Private (invitation only)' : 'Public (visible to all)'}
 Utility Fee: ${clubCreationData.isChargedContract ? '$1.25' : '$1.00'}/user/week
 
+Invite Link: ${window.location.origin}?join=${created.id}
+
 Your subclub is now live and ready for members to join!`);
-    
-    setActiveModal(null);
+
+      setActiveModal(null);
+    } catch (e) {
+      alert(e?.message || "Failed to create contract");
+    }
   };
 
   const CreateClubModal = () => {    

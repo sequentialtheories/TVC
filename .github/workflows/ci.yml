@@ -38,4 +38,4 @@ jobs:
 
       - name: Enforce coverage floor 80%
         run: |
-          node -e "const fs=require('fs');let pct=null;try{const s=JSON.parse(fs.readFileSync('./coverage/coverage-summary.json','utf8'));pct=s.total.statements.pct}catch(e){const f=JSON.parse(fs.readFileSync('./coverage/coverage-final.json','utf8'));pct=f.total.statements.pct} if(pct==null){process.exit(1)} console.log('Statements Coverage:',pct); if((+pct) < 80){process.exit(1)}"
+          node -e "const fs=require('fs');const p='./coverage/clover.xml';if(!fs.existsSync(p)){console.error('Missing clover.xml');process.exit(1)}const xml=fs.readFileSync(p,'utf8');const m=xml.match(/<metrics[^>]*statements=\\"(\\d+)\\"[^>]*coveredstatements=\\"(\\d+)\\"/);if(!m){console.error('Could not parse clover metrics');process.exit(1)}const total=+m[1],covered=+m[2];const pct=total?(covered/total*100):0;console.log('Statements Coverage:',pct.toFixed(2));if(pct<80){process.exit(1)}"

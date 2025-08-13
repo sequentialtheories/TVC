@@ -176,5 +176,14 @@ describe('emergency.pause/withdraw', () => {
       .expect(200)
 
     expect(typeof resW.body.data.refundableUSD).toBe('number')
+
+    const prog = await request(app)
+      .get('/vault/progress')
+      .set('authorization', `Bearer ${ownerToken}`)
+      .query({ subclubId })
+      .expect(200)
+
+    const me = prog.body.data.subclub.members.find((m: any) => m.userId)
+    expect(me.shareWeight).toBeCloseTo(0, 8)
   })
 })

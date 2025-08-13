@@ -215,6 +215,12 @@ app.post('/emergency/withdraw', requireAuth, rateLimit(true), requireSignature, 
   const { subclubId } = req.body || {}
   if (!subclubId) return res.status(400).json(err('bad_request', 'Missing subclubId'))
   const totalDeposits = Array.from(db.deposits.values()).filter(d => d.subclubId === subclubId && d.userId === req.userId!).reduce((a, b) => a + b.amountUSD, 0)
+  const mKey = `${subclubId}:${req.userId!}`
+  const mem = db.memberships.get(mKey)
+  if (mem) {
+    mem.shareWeight = 0
+    db.memberships.set(mKey, mem)
+  }
   return res.json(ok({ refundableUSD: totalDeposits }))
 })
 

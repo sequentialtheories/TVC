@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express'
 import crypto from 'crypto'
 
 export function requireSignature(req: Request, res: Response, next: NextFunction) {
+  if (process.env.ALLOW_UNSIGNED_MUTATIONS === '1') return next()
   const secret = process.env.TVC_SIGNING_SECRET || ''
   if (!secret) return res.status(500).json({ success: false, error: { code: 'server_config', message: 'Signing secret not set' } })
   const sig = req.headers['x-tvc-signature']

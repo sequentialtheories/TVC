@@ -30,6 +30,7 @@ export type Subclub = {
   startWeek: number
   phase2Trigger: { byTime: boolean; byTVL: boolean }
   inviteTokenHash: string | null
+  inviteTokenExpiresAt?: number
 }
 
 export type Membership = {

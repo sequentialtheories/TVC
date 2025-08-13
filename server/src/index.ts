@@ -8,6 +8,7 @@ import { AuthedRequest, requireAuth } from './middleware/auth.js'
 import { requireSignature } from './middleware/signing.js'
 import { ApiResponse, Epoch, Subclub } from './types.js'
 import { db, getWeekNow, makeHash, makeId } from './storage.js'
+import { runEpoch, warpWeeks } from './sim.js'
 
 const app = express()
 app.use(express.json())
@@ -87,7 +88,8 @@ app.post('/vault/init-subclub', requireAuth, requireSignature, (req: AuthedReque
     maxMembers: maxMembers || 4,
     startWeek: getWeekNow(),
     phase2Trigger: { byTime: false, byTVL: false },
-    inviteTokenHash: makeHash(inviteToken)
+    inviteTokenHash: makeHash(inviteToken),
+    inviteTokenExpiresAt: Date.now() + 1000 * 60 * 30
   }
   db.subclubs.set(id, sub)
   const mKey = `${id}:${req.userId!}`
@@ -101,6 +103,7 @@ app.post('/vault/join', requireAuth, requireSignature, (req: AuthedRequest, res)
   const h = makeHash(inviteToken)
   const sub = Array.from(db.subclubs.values()).find(s => s.inviteTokenHash === h)
   if (!sub) return res.status(404).json(err('invalid_invite', 'Invite not found'))
+  if (sub.inviteTokenExpiresAt && Date.now() > sub.inviteTokenExpiresAt) return res.status(400).json(err('invite_expired', 'Invite expired'))
   if (!sub.private) return res.status(400).json(err('invalid_invite', 'Not required'))
   const mKey = `${sub.id}:${req.userId!}`
   if (db.memberships.has(mKey)) return res.status(400).json(err('already_member', 'Already joined'))
@@ -192,6 +195,13 @@ app.post('/emergency/withdraw', requireAuth, requireSignature, (req: AuthedReque
   if (!subclubId) return res.status(400).json(err('bad_request', 'Missing subclubId'))
   const totalDeposits = Array.from(db.deposits.values()).filter(d => d.subclubId === subclubId && d.userId === req.userId!).reduce((a, b) => a + b.amountUSD, 0)
   return res.json(ok({ refundableUSD: totalDeposits }))
+})
+
+app.post('/admin/warp', requireAuth, requireSignature, (req: AuthedRequest, res) => {
+  const { subclubId, weeks } = req.body || {}
+  if (!subclubId || typeof weeks !== 'number' || weeks <= 0) return res.status(400).json(err('bad_request', 'Provide subclubId and weeks>0'))
+  warpWeeks(subclubId, weeks)
+  return res.json(ok({ warped: weeks }))
 })
 
 const port = Number(process.env.PORT || 8080)

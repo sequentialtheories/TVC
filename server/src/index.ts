@@ -1,3 +1,5 @@
+
+
 import express from 'express'
 import helmet from 'helmet'
 import compression from 'compression'
@@ -6,6 +8,7 @@ import jwt from 'jsonwebtoken'
 import fetch from 'node-fetch'
 import { AuthedRequest, requireAuth } from './middleware/auth.js'
 import { requireSignature } from './middleware/signing.js'
+import { requireCsrf } from './middleware/csrf.js'
 import { ApiResponse, Epoch, Subclub } from './types.js'
 import { db, getWeekNow, makeHash, makeId } from './storage.js'
 import { runEpoch, warpWeeks } from './sim.js'
@@ -30,11 +33,21 @@ function limited(key: string, mut: boolean = false): boolean {
   b.count++
   return false
 }
+function rateLimit(mut: boolean = false) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown'
+    if (limited(`ip:${ip}`, mut)) return res.status(429).json(err('rate_limited', 'Too many requests'))
+    next()
+  }
+}
+
+
 
 app.post('/auth/login', async (req, res) => {
   try {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown'
     if (limited(`ip:${ip}`, true)) return res.status(429).json(err('rate_limited', 'Too many requests'))
+
     const { email, password } = req.body || {}
     if (!email || !password) return res.status(400).json(err('bad_request', 'Email and password required'))
     const url = process.env.ST_AUTH_URL || ''
@@ -71,7 +84,7 @@ app.get('/wallet/me', requireAuth, (req: AuthedRequest, res) => {
   return res.json(ok({ address: w.address, chainId: w.chainId }))
 })
 
-app.post('/vault/init-subclub', requireAuth, requireSignature, (req: AuthedRequest, res) => {
+app.post('/vault/init-subclub', requireAuth, rateLimit(true), requireSignature, requireCsrf, (req: AuthedRequest, res) => {
   const { name, lockupWeeks, rigor, private: isPrivate, chargedContract, maxMembers, weeklyDepositUSD } = req.body || {}
   if (!name || !lockupWeeks || !rigor) return res.status(400).json(err('bad_request', 'Missing fields'))
   if (db.ops.circuitBreaker) return res.status(423).json(err('circuit_breaker', 'Deposits and inits are paused'))
@@ -99,7 +112,7 @@ app.post('/vault/init-subclub', requireAuth, requireSignature, (req: AuthedReque
   return res.json(ok({ subclubId: id, inviteToken }))
 })
 
-app.post('/vault/join', requireAuth, requireSignature, (req: AuthedRequest, res) => {
+app.post('/vault/join', requireAuth, rateLimit(true), requireSignature, requireCsrf, (req: AuthedRequest, res) => {
   const { inviteToken } = req.body || {}
   if (!inviteToken) return res.status(400).json(err('bad_request', 'Missing inviteToken'))
   const h = makeHash(inviteToken)
@@ -115,7 +128,7 @@ app.post('/vault/join', requireAuth, requireSignature, (req: AuthedRequest, res)
   return res.json(ok({ subclubId: sub.id }))
 })
 
-app.post('/vault/deposit', requireAuth, requireSignature, (req: AuthedRequest, res) => {
+app.post('/vault/deposit', requireAuth, rateLimit(true), requireSignature, requireCsrf, (req: AuthedRequest, res) => {
   if (db.ops.paused || db.ops.circuitBreaker) return res.status(423).json(err('paused', 'Deposits paused'))
   const { subclubId, amountUSD, epoch } = req.body || {}
   if (!subclubId || typeof amountUSD !== 'number') return res.status(400).json(err('bad_request', 'Missing fields'))
@@ -192,19 +205,25 @@ app.get('/vault/wbtc-balance', requireAuth, (req: AuthedRequest, res) => {
   return res.json(ok({ subclubId, totalWbtc: total }))
 })
 
-app.post('/emergency/pause', requireAuth, requireSignature, (req: AuthedRequest, res) => {
+app.post('/emergency/pause', requireAuth, rateLimit(true), requireSignature, requireCsrf, (req: AuthedRequest, res) => {
   db.ops.paused = true
   return res.json(ok({ paused: true }))
 })
 
-app.post('/emergency/withdraw', requireAuth, requireSignature, (req: AuthedRequest, res) => {
+app.post('/emergency/withdraw', requireAuth, rateLimit(true), requireSignature, requireCsrf, (req: AuthedRequest, res) => {
   const { subclubId } = req.body || {}
   if (!subclubId) return res.status(400).json(err('bad_request', 'Missing subclubId'))
   const totalDeposits = Array.from(db.deposits.values()).filter(d => d.subclubId === subclubId && d.userId === req.userId!).reduce((a, b) => a + b.amountUSD, 0)
   return res.json(ok({ refundableUSD: totalDeposits }))
 })
 
-app.post('/admin/warp', requireAuth, requireSignature, (req: AuthedRequest, res) => {
+app.get('/admin/epochs', requireAuth, (req: AuthedRequest, res) => {
+  const limit = Number((req.query.limit as string) || 8)
+  const items = Array.from(db.epochs.values()).sort((a, b) => b.week - a.week).slice(0, limit)
+  return res.json(ok({ items }))
+})
+
+app.post('/admin/warp', requireAuth, rateLimit(true), requireSignature, (req: AuthedRequest, res) => {
   const { subclubId, weeks } = req.body || {}
   if (!subclubId || typeof weeks !== 'number' || weeks <= 0) return res.status(400).json(err('bad_request', 'Provide subclubId and weeks>0'))
   warpWeeks(subclubId, weeks)

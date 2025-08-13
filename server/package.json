@@ -9,7 +9,22 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "test": "vitest run --coverage",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "warp": "tsx src/index.ts"
+  },
+  "vitest": {
+    "coverage": {
+      "reporter": [
+        "text",
+        "json-summary",
+        "html"
+      ],
+      "exclude": [
+        "src/index.ts",
+        "src/middleware/**",
+        "src/types.ts"
+      ]
+    }
   },
   "dependencies": {
     "compression": "^1.7.4",

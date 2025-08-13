@@ -15,17 +15,8 @@ const VAULT_CONTRACT_ABI = [
 
 // Connect wallet and return address or null
 async function connectWallet() {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return null;
-  }
-  try {
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-    return accounts[0];
-  } catch (error) {
-    console.error("Wallet connection rejected", error);
-    return null;
-  }
+  alert("This app uses your Sequence Theory wallet via SSO. Browser wallets are disabled.");
+  return null;
 }
 
 // Get vault balance for address - fallback version without ethers dependency
@@ -109,37 +100,14 @@ async function getMemberAllocation() {
 
 // Deposit amount (in ether) to vault contract
 async function depositToVault(amountEther) {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return false;
-  }
-  try {
-    // Simulate deposit for demo purposes
-    console.log(`Depositing ${amountEther} to vault...`);
-    alert(`Demo mode: Automated deposit of ${amountEther} successful!`);
-    return true;
-  } catch (error) {
-    console.error("Deposit failed:", error);
-    alert("Deposit transaction failed.");
-    return false;
-  }
+  alert("Use the TVC login to deposit with your Sequence Theory wallet. Browser wallets are disabled.");
+  return false;
 }
 
 // Harvest and route yields
 async function harvestAndRoute() {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return false;
-  }
-  try {
-    // Simulate harvest for demo purposes
-    alert("Demo mode: Harvest simulation successful!");
-    return true;
-  } catch (error) {
-    console.error("Harvest failed:", error);
-    alert("Harvest transaction failed.");
-    return false;
-  }
+  alert("Actions are handled by the TVC backend simulation. Browser wallets are disabled.");
+  return false;
 }
 
 const VaultClubWebsite = () => {
@@ -299,32 +267,9 @@ const VaultClubWebsite = () => {
 
   useEffect(() => {
     const initializeWallet = async () => {
-      if (window.ethereum) {
-        try {
-          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-          if (accounts.length > 0) {
-            setWalletConnected(true);
-            setWalletAddress(accounts[0]);
-            const balance = await getVaultBalance(accounts[0]);
-            setVaultBalance(balance);
-          }
-          
-          window.ethereum.on('accountsChanged', async (accounts) => {
-            if (accounts.length === 0) {
-              setWalletConnected(false);
-              setWalletAddress(null);
-              setVaultBalance("0");
-            } else {
-              setWalletConnected(true);
-              setWalletAddress(accounts[0]);
-              const balance = await getVaultBalance(accounts[0]);
-              setVaultBalance(balance);
-            }
-          });
-        } catch (error) {
-          console.error("Error initializing wallet:", error);
-        }
-      }
+      setWalletConnected(false);
+      setWalletAddress(null);
+      setVaultBalance("0");
     };
     initializeWallet();
   }, []);

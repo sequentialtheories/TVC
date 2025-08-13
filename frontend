@@ -3,11 +3,22 @@ import { Database, Settings, User, Users, TrendingUp, Info, X, Bitcoin, DollarSi
 const TVC_API_BASE = window.TVC_API_BASE || 'http://localhost:8080'
 const TVC_JWT_KEY = 'tvc_jwt'
 
+const TVC_CSRF_KEY = 'tvc_csrf_token'\n\nfunction getOrCreateCsrf() {\n  let t = localStorage.getItem(TVC_CSRF_KEY)\n  if (!t) {\n    t = Math.random().toString(36).slice(2)\n    localStorage.setItem(TVC_CSRF_KEY, t)\n  }\n  return t\n}\n\nasync function hmacHexSHA256(secret, message) {\n  try {\n    const enc = new TextEncoder()\n    const key = await crypto.subtle.importKey(\n      'raw',\n      enc.encode(secret),\n      { name: 'HMAC', hash: 'SHA-256' },\n      false,\n      ['sign']\n    )\n    const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message))\n    const bytes = new Uint8Array(sig)\n    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')\n  } catch {\n    return ''\n  }\n}\n
 async function apiFetch(path, opts = {}) {
-  const headers = opts.headers || {}
+  const headers = { ...(opts.headers || {}) }
   const token = localStorage.getItem(TVC_JWT_KEY)
   if (token) headers['Authorization'] = `Bearer ${token}`
-  return fetch(`${TVC_API_BASE}${path}`, { ...opts, headers: { 'content-type': 'application/json', ...headers } })
+  headers['content-type'] = 'application/json'
+  headers['X-CSRF-Token'] = getOrCreateCsrf()
+  let bodyStr = undefined
+  if (typeof opts.body === 'string') bodyStr = opts.body
+  else if (opts.body && typeof opts.body === 'object') bodyStr = JSON.stringify(opts.body)
+  else bodyStr = undefined
+  if (bodyStr && typeof window !== 'undefined' && window.TVC_SIGNING_SECRET) {
+    const sig = await hmacHexSHA256(window.TVC_SIGNING_SECRET, bodyStr)
+    if (sig) headers['X-TVC-Signature'] = sig
+  }
+  return fetch(`${TVC_API_BASE}${path}`, { ...opts, body: bodyStr, headers })
 }
 
 async function tvcLogin(email, password) {

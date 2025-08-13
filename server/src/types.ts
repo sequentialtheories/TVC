@@ -31,6 +31,7 @@ export type Subclub = {
   phase2Trigger: { byTime: boolean; byTVL: boolean }
   inviteTokenHash: string | null
   inviteTokenExpiresAt?: number
+  weeklyDepositUSD?: number
 }
 
 export type Membership = {

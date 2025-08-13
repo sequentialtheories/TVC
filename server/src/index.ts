@@ -74,6 +74,7 @@ app.get('/wallet/me', requireAuth, (req: AuthedRequest, res) => {
 app.post('/vault/init-subclub', requireAuth, requireSignature, (req: AuthedRequest, res) => {
   const { name, lockupWeeks, rigor, private: isPrivate, chargedContract, maxMembers, weeklyDepositUSD } = req.body || {}
   if (!name || !lockupWeeks || !rigor) return res.status(400).json(err('bad_request', 'Missing fields'))
+  if (db.ops.circuitBreaker) return res.status(423).json(err('circuit_breaker', 'Deposits and inits are paused'))
   const id = makeId('subclub')
   const inviteToken = makeId('invite')
   const sub: Subclub = {
@@ -89,7 +90,8 @@ app.post('/vault/init-subclub', requireAuth, requireSignature, (req: AuthedReque
     startWeek: getWeekNow(),
     phase2Trigger: { byTime: false, byTVL: false },
     inviteTokenHash: makeHash(inviteToken),
-    inviteTokenExpiresAt: Date.now() + 1000 * 60 * 30
+    inviteTokenExpiresAt: Date.now() + 1000 * 60 * 30,
+    weeklyDepositUSD: typeof weeklyDepositUSD === 'number' ? weeklyDepositUSD : undefined
   }
   db.subclubs.set(id, sub)
   const mKey = `${id}:${req.userId!}`
@@ -114,6 +116,7 @@ app.post('/vault/join', requireAuth, requireSignature, (req: AuthedRequest, res)
 })
 
 app.post('/vault/deposit', requireAuth, requireSignature, (req: AuthedRequest, res) => {
+  if (db.ops.paused || db.ops.circuitBreaker) return res.status(423).json(err('paused', 'Deposits paused'))
   const { subclubId, amountUSD, epoch } = req.body || {}
   if (!subclubId || typeof amountUSD !== 'number') return res.status(400).json(err('bad_request', 'Missing fields'))
   const sub = db.subclubs.get(subclubId)
@@ -152,6 +155,8 @@ app.get('/vault/progress', requireAuth, (req: AuthedRequest, res) => {
   const eKey = `${subclubId}:${currentWeek}`
   const epoch = db.epochs.get(eKey) || { subclubId, week: currentWeek, p1USD: 0, p2USD: 0, p3USD: 0, profitP1: 0, profitP2: 0, profitP3: 0, tvlUSD: 0, phase2Active: false, dcaUSD: 0, btcPrice: 0 }
   const tvlUSD = Array.from(db.epochs.values()).filter(e => e.subclubId === subclubId).reduce((a, b) => a + b.p1USD + b.p2USD + b.p3USD, 0)
+  const nextDueWeek = currentWeek + 1
+  const nextDueDate = new Date((nextDueWeek) * 7 * 24 * 60 * 60 * 1000).toISOString()
   return res.json(ok({
     subclub: {
       id: sub.id,
@@ -167,7 +172,9 @@ app.get('/vault/progress', requireAuth, (req: AuthedRequest, res) => {
       profitsUSD: { p1: epoch.profitP1, p2: epoch.profitP2, p3: epoch.profitP3 },
       postRRLUSD: { p1: epoch.p1USD, p2: epoch.p2USD, p3: epoch.p3USD },
       userBalancesUSD: members.map(m => ({ userId: m.userId, balance: m.depositedUSD })),
-      penalties: Array.from(db.penalties.values()).filter(p => p.subclubId === subclubId && p.week === currentWeek).map(p => ({ userId: p.userId, deltaShare: p.deltaShare, reason: p.reason }))
+      penalties: Array.from(db.penalties.values()).filter(p => p.subclubId === subclubId && p.week === currentWeek).map(p => ({ userId: p.userId, deltaShare: p.deltaShare, reason: p.reason })),
+      nextDueWeek,
+      nextDueDate
     },
     phase2: {
       active: sub.status === 'phase2',

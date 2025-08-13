@@ -10,7 +10,7 @@ export const db = {
   deposits: new Map<string, { id: string; subclubId: string; userId: string; week: number; amountUSD: number; createdAt: number }>(),
   penalties: new Map<string, Penalty>(),
   wbtc: new Map<string, WbtcLedger>(),
-  ops: { paused: false as boolean, lastJobRunAt: 0 as number }
+  ops: { paused: false as boolean, circuitBreaker: false as boolean, lastJobRunAt: 0 as number }
 }
 
 export function makeId(prefix: string = 'id'): string {

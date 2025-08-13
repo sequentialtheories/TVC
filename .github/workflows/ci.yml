@@ -38,6 +38,4 @@ jobs:
 
       - name: Enforce coverage floor 80%
         run: |
-          TOTAL=$(node -e "console.log(require('./coverage/coverage-final.json')['total'].statements.pct)")
-          echo "Statements Coverage: $TOTAL"
-          awk -v t=$TOTAL 'BEGIN{ if (t+0 < 80) { exit 1 } }'
+          node -e "const fs=require('fs');let pct=null;try{const s=JSON.parse(fs.readFileSync('./coverage/coverage-summary.json','utf8'));pct=s.total.statements.pct}catch(e){const f=JSON.parse(fs.readFileSync('./coverage/coverage-final.json','utf8'));pct=f.total.statements.pct} if(pct==null){process.exit(1)} console.log('Statements Coverage:',pct); if((+pct) < 80){process.exit(1)}"

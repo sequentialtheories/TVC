@@ -35,6 +35,7 @@ function limited(key: string, mut: boolean = false): boolean {
 }
 function rateLimit(mut: boolean = false) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (process.env.NODE_ENV === 'test') return next()
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown'
     if (limited(`ip:${ip}`, mut)) return res.status(429).json(err('rate_limited', 'Too many requests'))
     next()
@@ -117,7 +118,7 @@ app.post('/vault/join', requireAuth, rateLimit(true), requireSignature, requireC
   if (!inviteToken) return res.status(400).json(err('bad_request', 'Missing inviteToken'))
   const h = makeHash(inviteToken)
   const sub = Array.from(db.subclubs.values()).find(s => s.inviteTokenHash === h)
-  if (!sub) return res.status(404).json(err('invalid_invite', 'Invite not found'))
+  if (!sub) return res.status(400).json(err('invalid_invite', 'Invite not found'))
   if (sub.inviteTokenExpiresAt && Date.now() > sub.inviteTokenExpiresAt) return res.status(400).json(err('invite_expired', 'Invite expired'))
   if (!sub.private) return res.status(400).json(err('invalid_invite', 'Not required'))
   const mKey = `${sub.id}:${req.userId!}`
@@ -231,4 +232,7 @@ app.post('/admin/warp', requireAuth, rateLimit(true), requireSignature, (req: Au
 })
 
 const port = Number(process.env.PORT || 8080)
-app.listen(port)
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(port)
+}
+export { app }

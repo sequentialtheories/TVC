@@ -1,5 +1,63 @@
+
 import React, { useState, useEffect } from 'react';
 import { Database, Settings, User, Users, TrendingUp, Info, X, Bitcoin, DollarSign, Zap, Shield, ArrowLeft, Wallet, Home, Share2, MessageSquare, Heart, Reply, Plus, Filter, Search } from 'lucide-react';
+const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_TVC_API_BASE) || '';
+let runtimeDisableMM = false;
+const DISABLE_METAMASK = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_DISABLE_METAMASK) === '1';
+function isMMDisabled() {
+  return DISABLE_METAMASK || runtimeDisableMM;
+}
+async function apiFetch(path, opts = {}) {
+  const url = `${API_BASE}${path}`;
+  let attempt = 0;
+  let lastErr;
+  while (attempt < 3) {
+    const res = await fetch(url, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+      ...opts,
+    });
+    const rid = res.headers ? res.headers.get('x-request-id') || '' : '';
+    let json = null;
+    try { json = await res.json(); } catch (_) {}
+    if (res.ok && (!json || json.success !== false)) {
+      return json;
+    }
+    const status = res.status;
+    const msg = (json && (json.error || json.message)) || res.statusText || 'Request failed';
+    const err = new Error(`${msg}${rid ? ` [${rid}]` : ''}`);
+    if (status === 401) {
+      try { await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' } }); } catch (_) {}
+      throw err;
+    }
+    if (status >= 500) {
+      lastErr = err;
+      attempt += 1;
+      const backoff = Math.min(1000 * Math.pow(2, attempt - 1), 3000);
+      await new Promise(r => setTimeout(r, backoff));
+      continue;
+    }
+    throw err;
+  }
+  throw lastErr || new Error('Request failed');
+}
+async function loginWithToken(stAccessToken) {
+  if (!stAccessToken) throw new Error('missing token');
+  return apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ stAccessToken }) });
+}
+async function getMe() {
+  return apiFetch('/auth/me', { method: 'GET' });
+}
+async function logout() {
+  return apiFetch('/auth/logout', { method: 'POST' });
+}
+async function vaultJoin(inviteToken) {
+  return apiFetch('/vault/join', { method: 'POST', body: JSON.stringify({ token: inviteToken }) });
+}
+async function vaultProgress() {
+  return apiFetch('/vault/progress', { method: 'GET' });
+}
+
 
 // Replace with your actual contract address and ABI
 const VAULT_CONTRACT_ADDRESS = "0xYourVaultContractAddressHere";
@@ -15,8 +73,11 @@ const VAULT_CONTRACT_ABI = [
 
 // Connect wallet and return address or null
 async function connectWallet() {
+  if (isMMDisabled()) {
+    alert("Wallet is managed by The Vault Club session. Please sign in instead.");
+    return null;
+  }
   if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
     return null;
   }
   try {
@@ -103,18 +164,19 @@ async function getBitcoinPrice() {
 
 // Get member allocation data from contract
 async function getMemberAllocation() {
-  // Return empty array since no real deposits have been made
   return [];
 }
 
 // Deposit amount (in ether) to vault contract
 async function depositToVault(amountEther) {
+  if (isMMDisabled()) {
+    alert("Deposits are managed by The Vault Club. Use the app actions.");
+    return false;
+  }
   if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
     return false;
   }
   try {
-    // Simulate deposit for demo purposes
     console.log(`Depositing ${amountEther} to vault...`);
     alert(`Demo mode: Automated deposit of ${amountEther} successful!`);
     return true;
@@ -127,12 +189,14 @@ async function depositToVault(amountEther) {
 
 // Harvest and route yields
 async function harvestAndRoute() {
+  if (isMMDisabled()) {
+    alert("Harvest operations are managed by The Vault Club.");
+    return false;
+  }
   if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
     return false;
   }
   try {
-    // Simulate harvest for demo purposes
     alert("Demo mode: Harvest simulation successful!");
     return true;
   } catch (error) {
@@ -151,9 +215,85 @@ const VaultClubWebsite = () => {
   const [autoRenewEnabled, setAutoRenewEnabled] = useState(false);
   const [vaultBalance, setVaultBalance] = useState("0");
   const [depositAmount, setDepositAmount] = useState('');
+  useEffect(() => {
+    (async () => {
+      try {
+        const cfg = await apiFetch('/config', { method: 'GET' });
+        if (cfg && cfg.data && typeof cfg.data.disableMetaMask !== 'undefined') {
+          runtimeDisableMM = !!cfg.data.disableMetaMask;
+        }
+      } catch (_) {}
+    })();
+  }, []);
+
+
+  const [sessionUser, setSessionUser] = useState(null);
+  const [sessionWallet, setSessionWallet] = useState(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const stToken = hashParams.get('token');
+        if (stToken) {
+          if (typeof setAuthLoading === 'function') setAuthLoading(true);
+          await loginWithToken(stToken);
+          history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
+        try {
+          const me = await getMe();
+          const u = me && me.data ? me.data.user : null;
+          const w = me && me.data ? me.data.wallet : null;
+          if (typeof setSessionUser === 'function') setSessionUser(u || null);
+          if (typeof setSessionWallet === 'function') setSessionWallet(w || null);
+        } catch (_) {}
+      } catch (_) {
+        alert('Sign-in failed. Please try again.');
+      } finally {
+        if (typeof setAuthLoading === 'function') setAuthLoading(false);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const joinToken = url.searchParams.get('join');
+    if (!joinToken) return;
+
+    if (!sessionUser) {
+      alert('Please sign in first, then try the invite link again.');
+      url.searchParams.delete('join');
+      window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ''));
+      return;
+    }
+
+    (async () => {
+      try {
+        await vaultJoin(joinToken);
+        alert('Successfully joined via invite.');
+      } catch (e) {
+        const msg = (e && e.message) ? e.message : 'Join failed';
+        alert(`Invite error: ${msg}`);
+      } finally {
+        url.searchParams.delete('join');
+        window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ''));
+      }
+    })();
+  }, [sessionUser]);
+
+
+  useEffect(() => {
+    if (sessionWallet && sessionWallet.address) {
+      setWalletConnected(true);
+      setWalletAddress(sessionWallet.address);
+    }
+  }, [sessionWallet]);
+
+
   
   // Club creation states
   const [clubCreationData, setClubCreationData] = useState({
+
     lockupPeriod: 5,
     rigorLevel: 'medium',
     maxMembers: 4,
@@ -206,54 +346,7 @@ const VaultClubWebsite = () => {
   const [newPostCategory, setNewPostCategory] = useState('General Discussion');
   const [showNewPostModal, setShowNewPostModal] = useState(false);
 
-  // Handle URL-based contract joining
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const joinContractId = urlParams.get('join');
-    
-    if (joinContractId && walletConnected) {
-      // Find the contract to join
-      const contractToJoin = deployedSubclubs.find(club => 
-        club.contractAddress === joinContractId && 
-        !club.isPrivate && 
-        club.currentMembers < club.maxMembers &&
-        (!club.members || !club.members.includes(walletAddress))
-      );
-      
-      if (contractToJoin) {
-        // Auto-join the contract
-        const updatedContract = {
-          ...contractToJoin,
-          currentMembers: contractToJoin.currentMembers + 1,
-          members: [...(contractToJoin.members || []), walletAddress]
-        };
-        
-        setDeployedSubclubs(prev => 
-          prev.map(club => 
-            club.contractAddress === joinContractId ? updatedContract : club
-          )
-        );
-        
-        alert(`✅ Successfully joined subclub contract!\n\n${contractToJoin.lockupPeriod} ${contractToJoin.isChargedContract ? 'Month' : 'Year'} Lockup • ${contractToJoin.rigorLevel.charAt(0).toUpperCase() + contractToJoin.rigorLevel.slice(1)} Rigor\n\nYou can now start making deposits according to the contract schedule.`);
-        
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } else if (joinContractId) {
-        // Contract not found, full, private, or user already a member
-        const existingContract = deployedSubclubs.find(club => club.contractAddress === joinContractId);
-        if (existingContract) {
-          if (existingContract.isPrivate) {
-            alert('❌ This is a private contract. You need a direct invitation from the contract owner.');
-          } else if (existingContract.currentMembers >= existingContract.maxMembers) {
-            alert('❌ This contract is full. No more members can join.');
-          } else if (existingContract.members && existingContract.members.includes(walletAddress)) {
-            alert('ℹ️ You are already a member of this contract.');
-          }
-        } else {
-          alert('❌ Contract not found. The link may be invalid or the contract may not be deployed yet.');
-        }
-        
-        // Clean up URL
+
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
@@ -278,11 +371,9 @@ const VaultClubWebsite = () => {
         const bitcoinPrice = await getBitcoinPrice();
         setBtcPrice(bitcoinPrice);
 
-        // Load vault stats
+        // TODO: Replace with live backend progress when available
         const stats = await getVaultStats();
         setVaultStats(stats);
-
-        // Load member allocation
         const members = await getMemberAllocation();
         setMemberAllocation(members);
       } catch (error) {
@@ -298,6 +389,7 @@ const VaultClubWebsite = () => {
   }, []);
 
   useEffect(() => {
+    if (isMMDisabled()) return;
     const initializeWallet = async () => {
       if (window.ethereum) {
         try {
@@ -1933,7 +2025,7 @@ Your subclub is now live and ready for members to join!`);
                     onClick={() => {
                       // Generate shareable URL
                       const baseUrl = window.location.origin + window.location.pathname;
-                      const shareUrl = `${baseUrl}?join=${subclub.contractAddress}`;
+                      const shareUrl = `${baseUrl}?join=${encodeURIComponent('INVITE_TOKEN')}`;
                       
                       // Copy to clipboard
                       navigator.clipboard.writeText(shareUrl).then(() => {
@@ -2755,6 +2847,41 @@ Your subclub is now live and ready for members to join!`);
                 {/* Vault safe outline */}
                 <rect x="5" y="15" width="90" height="75" rx="8" ry="8" fill="#2d2d2d" stroke="#1a1a1a" strokeWidth="2"/>
                 <rect x="10" y="20" width="80" height="65" rx="4" ry="4" fill="#f8f8f8"/>
+            <div className="hidden md:flex items-center space-x-3">
+              {sessionWallet && sessionWallet.address ? (
+                <>
+                  <div className="px-3 py-2 rounded-full bg-white/60 text-gray-800 flex items-center space-x-2">
+                    <Wallet className="w-4 h-4" />
+                    <span title={sessionWallet.address}>
+                      {sessionWallet.address.slice(0, 6)}…{sessionWallet.address.slice(-4)}
+                    </span>
+                    <span className="ml-2 text-xs text-gray-600">(80002)</span>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await logout();
+                      } catch (_) {}
+                      if (typeof setSessionUser === 'function') setSessionUser(null);
+                      if (typeof setSessionWallet === 'function') setSessionWallet(null);
+                      if (typeof setWalletConnected === 'function') setWalletConnected(false);
+                      if (typeof setWalletAddress === 'function') setWalletAddress(null);
+                    }}
+                    className="px-3 py-2 rounded-full bg-red-500/90 text-white hover:bg-red-500 transition"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => alert('Sign in by providing your ST access token to /auth/login (or visit with #token=<ST_TOKEN> in dev)')}
+                  className="px-3 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition"
+                >
+                  Sign in
+                </button>
+              )}
+            </div>
+
                 
                 {/* Vault door handle/wheel */}
                 <circle cx="30" cy="45" r="18" fill="#2d2d2d"/>
@@ -2792,6 +2919,41 @@ Your subclub is now live and ready for members to join!`);
               </div>
             </div>
           </div>
+              <div className="hidden md:flex items-center space-x-3">
+                {sessionWallet && sessionWallet.address ? (
+                  <>
+                    <div className="px-3 py-2 rounded-full bg-white/60 text-gray-800 flex items-center space-x-2">
+                      <Wallet className="w-4 h-4" />
+                      <span title={sessionWallet.address}>
+                        {sessionWallet.address.slice(0, 6)}…{sessionWallet.address.slice(-4)}
+                      </span>
+                      <span className="ml-2 text-xs text-gray-600">(80002)</span>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await logout();
+                        } catch (_) {}
+                        setSessionUser(null);
+                        setSessionWallet(null);
+                        setWalletConnected(false);
+                        setWalletAddress(null);
+                      }}
+                      className="px-3 py-2 rounded-full bg-red-500/90 text-white hover:bg-red-500 transition"
+                    >
+                      Logout
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => alert('Sign in by providing your ST access token to /auth/login (or visit with #token=<ST_TOKEN> in dev)')}
+                    className="px-3 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition"
+                  >
+                    Sign in
+                  </button>
+                )}
+              </div>
+
           
           <div className="flex items-center space-x-4">
             {/* Sequence Theory Logo - moved to right side */}

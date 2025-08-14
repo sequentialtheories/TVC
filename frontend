@@ -281,16 +281,6 @@ const VaultClubWebsite = () => {
     })();
   }, [sessionUser]);
 
-    (async () => {
-      try {
-        const cfg = await apiFetch('/config', { method: 'GET' });
-        if (cfg && cfg.data && typeof cfg.data.disableMetaMask !== 'undefined') {
-          runtimeDisableMM = !!cfg.data.disableMetaMask;
-        }
-      } catch (_) {}
-    })();
-  }, []);
-
 
   useEffect(() => {
     if (sessionWallet && sessionWallet.address) {
@@ -299,37 +289,8 @@ const VaultClubWebsite = () => {
     }
   }, [sessionWallet]);
 
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const joinToken = urlParams.get('join');
-    if (!joinToken) return;
-    (async () => {
-      try {
-        if (!sessionUser) {
-          alert('Please sign in first and then join again.');
-          return;
-        }
-        await vaultJoin(joinToken);
-        alert('✅ Successfully joined subclub contract via The Vault Club!');
-      } catch (_) {
-        alert('❌ Invite invalid or expired. Please request a fresh invite.');
-      } finally {
-        urlParams.delete('join');
-        const qs = urlParams.toString();
-        const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-        window.history.replaceState({}, document.title, newUrl);
-      }
-    })();
-  }, [sessionUser]);
 
   
-  useEffect(() => {
-    if (sessionWallet && sessionWallet.address) {
-      setWalletConnected(true);
-      setWalletAddress(sessionWallet.address);
-    }
-  }, [sessionWallet]);
-
   // Club creation states
   const [clubCreationData, setClubCreationData] = useState({
 

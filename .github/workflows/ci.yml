@@ -1,0 +1,62 @@
+name: TVC Backend Bridge CI
+
+on:
+  push:
+    branches: [ main, "devin/**" ]
+  pull_request:
+
+jobs:
+  backend-ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Enforce testnet-first
+        run: |
+          echo "NETWORK=${NETWORK}"
+          echo "CHAIN_ID=${CHAIN_ID}"
+          if [ "${NETWORK}" != "amoy" ] || [ "${CHAIN_ID}" != "80002" ]; then
+            echo "Non-Amoy detected. Failing."
+            exit 1
+          fi
+        env:
+          NETWORK: amoy
+          CHAIN_ID: "80002"
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test with coverage
+        env:
+          NODE_ENV: test
+          NETWORK: amoy
+          CHAIN_ID: "80002"
+          JWT_SECRET: testsecret_testsecret
+          VAULT_CLUB_API_KEY: test
+          HMAC_SECRET: test
+          ST_API_AUTH: https://example.supabase.co/functions/v1
+          ST_EXTERNAL_API: https://example.supabase.co/functions/v1
+        run: npm run coverage
+
+      - name: Verify clover.xml
+        run: test -f coverage/clover.xml
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: backend/coverage/clover.xml

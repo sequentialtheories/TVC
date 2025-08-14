@@ -1,5 +1,53 @@
 import React, { useState, useEffect } from 'react';
 import { Database, Settings, User, Users, TrendingUp, Info, X, Bitcoin, DollarSign, Zap, Shield, ArrowLeft, Wallet, Home, Share2, MessageSquare, Heart, Reply, Plus, Filter, Search } from 'lucide-react';
+const TVC_ENV = {
+  VITE_TVC_API_BASE: (typeof import !== 'undefined' && typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_TVC_API_BASE) || (typeof window !== 'undefined' && (window as any).__TVC_CONFIG && (window as any).__TVC_CONFIG.VITE_TVC_API_BASE) || '',
+  VITE_DISABLE_METAMASK: (((typeof import !== 'undefined' && typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_DISABLE_METAMASK) || (typeof window !== 'undefined' && (window as any).__TVC_CONFIG && (window as any).__TVC_CONFIG.VITE_DISABLE_METAMASK) || '0') === '1'),
+  FEATURE_TESTNET_ONLY: (((typeof import !== 'undefined' && typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.FEATURE_TESTNET_ONLY) || (typeof window !== 'undefined' && (window as any).__TVC_CONFIG && (window as any).__TVC_CONFIG.FEATURE_TESTNET_ONLY) || '0') === '1'),
+  CHAIN_ID: Number(((typeof import !== 'undefined' && typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.CHAIN_ID) || (typeof window !== 'undefined' && (window as any).__TVC_CONFIG && (window as any).__TVC_CONFIG.CHAIN_ID) || 1)),
+  SIMULATION_MODE: (((typeof import !== 'undefined' && typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.SIMULATION_MODE) || (typeof window !== 'undefined' && (window as any).__TVC_CONFIG && (window as any).__TVC_CONFIG.SIMULATION_MODE) || '0') === '1'),
+  VITE_ENABLE_FRAGMENT_LOGIN: (((typeof import !== 'undefined' && typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_ENABLE_FRAGMENT_LOGIN) || (typeof window !== 'undefined' && (window as any).__TVC_CONFIG && (window as any).__TVC_CONFIG.VITE_ENABLE_FRAGMENT_LOGIN) || '1') === '1'),
+};
+
+export async function api(path, init = {}) {
+  const res = await fetch(`${TVC_ENV.VITE_TVC_API_BASE || ''}${path}`, {
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
+    ...init,
+  });
+  let data = {};
+  try { data = await res.json(); } catch {}
+  if (!res.ok || (data && data.success === false)) {
+    if (res.status === 401) {
+      try { window.location.assign('/'); } catch {}
+    }
+    throw new Error((data && data.error && (data.error.message || data.error)) || res.statusText);
+  }
+  return data && data.data !== undefined ? data.data : data;
+}
+
+function EnvironmentBanner({ env }) {
+  if (!env.SIMULATION_MODE && !env.FEATURE_TESTNET_ONLY) return null;
+  return (
+    <div style={{background:'#b91c1c',color:'#fff',padding:'6px 10px'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div>Non-Prod Mode: Simulation/Testnet features enabled</div>
+        <span>▼</span>
+      </div>
+      <details>
+        <summary style={{cursor:'pointer', userSelect:'none'}}>Details</summary>
+        <div style={{marginTop:'6px'}}>
+          <div>VITE_DISABLE_METAMASK: {String(env.VITE_DISABLE_METAMASK)}</div>
+          <div>FEATURE_TESTNET_ONLY: {String(env.FEATURE_TESTNET_ONLY)}</div>
+          <div>CHAIN_ID: {String(env.CHAIN_ID)}</div>
+          <div>SIMULATION_MODE: {String(env.SIMULATION_MODE)}</div>
+          <div>VITE_ENABLE_FRAGMENT_LOGIN: {String(env.VITE_ENABLE_FRAGMENT_LOGIN)}</div>
+        </div>
+      </details>
+    </div>
+  );
+}
+
 
 // Replace with your actual contract address and ABI
 const VAULT_CONTRACT_ADDRESS = "0xYourVaultContractAddressHere";
@@ -15,6 +63,9 @@ const VAULT_CONTRACT_ABI = [
 
 // Connect wallet and return address or null
 async function connectWallet() {
+  if (TVC_ENV.VITE_DISABLE_METAMASK) {
+    return null;
+  }
   if (!window.ethereum) {
     alert("MetaMask is required to use this app.");
     return null;
@@ -109,12 +160,14 @@ async function getMemberAllocation() {
 
 // Deposit amount (in ether) to vault contract
 async function depositToVault(amountEther) {
+  if (TVC_ENV.VITE_DISABLE_METAMASK) {
+    return false;
+  }
   if (!window.ethereum) {
     alert("MetaMask is required to use this app.");
     return false;
   }
   try {
-    // Simulate deposit for demo purposes
     console.log(`Depositing ${amountEther} to vault...`);
     alert(`Demo mode: Automated deposit of ${amountEther} successful!`);
     return true;
@@ -127,12 +180,14 @@ async function depositToVault(amountEther) {
 
 // Harvest and route yields
 async function harvestAndRoute() {
+  if (TVC_ENV.VITE_DISABLE_METAMASK) {
+    return false;
+  }
   if (!window.ethereum) {
     alert("MetaMask is required to use this app.");
     return false;
   }
   try {
-    // Simulate harvest for demo purposes
     alert("Demo mode: Harvest simulation successful!");
     return true;
   } catch (error) {
@@ -299,6 +354,9 @@ const VaultClubWebsite = () => {
 
   useEffect(() => {
     const initializeWallet = async () => {
+      if (TVC_ENV.VITE_DISABLE_METAMASK) {
+        return;
+      }
       if (window.ethereum) {
         try {
           const accounts = await window.ethereum.request({ method: 'eth_accounts' });
@@ -2725,6 +2783,8 @@ Your subclub is now live and ready for members to join!`);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50/50 via-teal-50/30 to-teal-100/40" style={{backgroundColor: '#edfffe'}}>
+        <EnvironmentBanner env={TVC_ENV} />
+
       <style jsx>{`
         @keyframes fade-in-out {
           0% { opacity: 0; transform: translate(-50%, -20px); }

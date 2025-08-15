@@ -1,0 +1,41 @@
+{
+  "5y_heavy_1member": {
+    "finalTotal": 38757,
+    "finalBalances": {
+      "capital": 0,
+      "yield": 0,
+      "momentum": 0
+    },
+    "checkpoints": {
+      "week1": { "total": 100, "capital": 10, "yield": 60, "momentum": 30 },
+      "week52": { "total": 5200, "capital": 520, "yield": 3120, "momentum": 1560 },
+      "phaseTransition": { "total": 13000, "capital": 1300, "yield": 7800, "momentum": 3900 }
+    }
+  },
+  "10y_medium_1member": {
+    "finalTotal": 70064,
+    "finalBalances": {
+      "capital": 0,
+      "yield": 0,
+      "momentum": 0
+    },
+    "checkpoints": {
+      "week1": { "total": 50, "capital": 5, "yield": 30, "momentum": 15 },
+      "week52": { "total": 2600, "capital": 260, "yield": 1560, "momentum": 780 },
+      "phaseTransition": { "total": 15600, "capital": 1560, "yield": 9360, "momentum": 4680 }
+    }
+  },
+  "15y_light_4members": {
+    "finalTotal": 46023,
+    "finalBalances": {
+      "capital": 0,
+      "yield": 0,
+      "momentum": 0
+    },
+    "checkpoints": {
+      "week1": { "total": 23, "capital": 2, "yield": 14, "momentum": 7 },
+      "week52": { "total": 1196, "capital": 120, "yield": 718, "momentum": 359 },
+      "phaseTransition": { "total": 7176, "capital": 718, "yield": 4305, "momentum": 2153 }
+    }
+  }
+}

@@ -330,161 +330,51 @@ const VaultClubWebsite = () => {
   }, []);
 
   // Calculate simulation data using RRL formula with dynamic APYs
-  const calculateSimulation = () => {
-    const data = [];
-    let V1 = 0, V2 = 0, V3 = 0, wBTC = 0; // Starting balances including wBTC
-    const weeksPerYear = 52;
-    const totalWeeks = simulationYears * weeksPerYear;
-    
-    // Convert APY to weekly rates using dynamic data
-    const r1 = Math.pow(1 + apyStrand1/100, 1/weeksPerYear) - 1;
-    const r2 = Math.pow(1 + apyStrand2/100, 1/weeksPerYear) - 1;
-    const r3 = Math.pow(1 + apyStrand3/100, 1/weeksPerYear) - 1;
-
-    // Gas fee estimates (in USD) - these could also be made dynamic
-    const gasFeesPerWeek = {
-      harvestYield: 0.175,
-      executeRRLCycle: 0.315,
-      chainlinkUpkeep: 0.085,
-      weeklyTotal: 0.575
-    };
-    
-    // Utility fee: $1/week/user
-    const utilityFeePerWeek = (vaultStats.totalMembers || 1) * 1;
-
-    for (let week = 0; week <= totalWeeks; week++) {
-      const year = Math.floor(week / weeksPerYear) + 1;
-      const progressPercent = week / totalWeeks;
+  const calculateSimulation = async () => {
+    try {
+      const { run } = await import('@tvc/rrl-core');
       
-      // Phase 2 trigger: 50% completion OR ~$2M subclub value
-      const phase2Triggered = progressPercent >= 0.5 || (V1 + V2 + V3 + wBTC) >= 2000000;
+      const result = run({
+        simulationYears,
+        rigorLevel: simulationRigor,
+        customAmount: customSimulationAmount,
+        aaveAPY: apyStrand1,
+        quickswapAPY: apyStrand3,
+        btcPrice,
+        memberCount: vaultStats.totalMembers || 1,
+        isChargedContract: false
+      });
       
-      // Calculate weekly deposit based on selected rigor
-      let weeklyDeposit;
+      // Transform result.steps to match existing chartData format
+      const data = result.steps.map(step => ({
+        year: Math.floor(step.week / 52),
+        total: step.totalValue,
+        strand1: step.balances.capital,
+        strand2: step.balances.yield,
+        strand3: step.balances.momentum,
+        wbtc: 0,
+        phase: step.phase,
+        perMember: Math.round(step.totalValue / Math.max(vaultStats.totalMembers || 1, 1)),
+        cumulativeGasFees: Math.round(step.gasFeesPerWeek * step.week),
+        cumulativeUtilityFees: Math.round(step.utilityFeesPerWeek * step.week)
+      }));
       
-      if (simulationRigor === 'light') {
-        // Light rigor: monthly deposits converted to weekly
-        if (year <= 1) weeklyDeposit = 100 / 4.33;       // $100/month
-        else if (year <= 2) weeklyDeposit = 150 / 4.33;  // $150/month
-        else if (year <= 3) weeklyDeposit = 200 / 4.33;  // $200/month
-        else weeklyDeposit = 250 / 4.33;                 // $250/month
-      } else if (simulationRigor === 'medium') {
-        // Medium rigor deposit schedule
-        if (year <= 3) weeklyDeposit = 50;
-        else if (year <= 6) weeklyDeposit = 100;
-        else if (year <= 10) weeklyDeposit = 200;
-        else weeklyDeposit = 250;
-      } else if (simulationRigor === 'heavy') {
-        // Heavy rigor deposit schedule
-        if (year <= 3) weeklyDeposit = 100;
-        else if (year <= 6) weeklyDeposit = 200;
-        else if (year <= 10) weeklyDeposit = 300;
-        else weeklyDeposit = 400;
-      } else {
-        // Custom rigor - use user-defined amount
-        weeklyDeposit = customSimulationAmount;
+      // Final conversion: dump remaining strands into wBTC at contract conclusion
+      if (data.length > 0) {
+        const finalData = data[data.length - 1];
+        const remainingStrands = finalData.strand1 + finalData.strand2 + finalData.strand3;
+        finalData.wbtc = result.finalTotal;
+        finalData.strand1 = 0;
+        finalData.strand2 = 0;
+        finalData.strand3 = 0;
+        finalData.total = finalData.wbtc;
       }
-
-      if (week > 0) {
-        if (!phase2Triggered) {
-          // PHASE 1: Normal RRL operation
-          // Split deposits (10%, 60%, 30%) - correct allocation from documents
-          const D1 = weeklyDeposit * 0.10;
-          const D2 = weeklyDeposit * 0.60;
-          const D3 = weeklyDeposit * 0.30;
-
-          // Calculate profits from previous week
-          const P1 = V1 * r1;
-          const P2 = V2 * r2;
-          const P3 = V3 * r3;
-
-          // Apply CORRECT RRL formula from documents:
-          // V₁(t+1) = V₁(t)(1 + r₁) + D₁ + 0.3P₃ + 0.1P₂ - 0.6P₁
-          // V₂(t+1) = V₂(t)(1 + r₂) + D₂ + 0.4P₁ - 0.5P₂  
-          // V₃(t+1) = V₃(t)(1 + r₃) + D₃ + 0.2P₁ + 0.4P₂ - 0.3P₃
-          
-          V1 = V1 * (1 + r1) + D1 + 0.3 * P3 + 0.1 * P2 - 0.6 * P1;
-          V2 = V2 * (1 + r2) + D2 + 0.4 * P1 - 0.5 * P2;
-          V3 = V3 * (1 + r3) + D3 + 0.2 * P1 + 0.4 * P2 - 0.3 * P3;
-        } else {
-          // PHASE 2: Transition to wBTC
-          // All new deposits go to Strand 1 (AAVE Reserve)
-          V1 = V1 * (1 + r1) + weeklyDeposit;
-          V2 = V2 * (1 + r2);
-          V3 = V3 * (1 + r3);
-          
-          // Weekly 5% migration from Strands 2&3 to Strand 1, then to wBTC
-          const migrationFromV2 = V2 * 0.05;
-          const migrationFromV3 = V3 * 0.05;
-          
-          V2 -= migrationFromV2;
-          V3 -= migrationFromV3;
-          V1 += migrationFromV2 + migrationFromV3;
-          
-          // Weekly wBTC DCA purchases from Strand 1
-          let weeklyDCA;
-          if (simulationRigor === 'light') weeklyDCA = Math.min(V1 * 0.1, 1000);
-          else if (simulationRigor === 'medium') weeklyDCA = Math.min(V1 * 0.1, 5000);
-          else if (simulationRigor === 'heavy') weeklyDCA = Math.min(V1 * 0.1, 10000);
-          else weeklyDCA = Math.min(V1 * 0.1, 2000); // Custom
-          
-          V1 -= weeklyDCA;
-          wBTC += weeklyDCA;
-        }
-
-        // Subtract weekly gas fees and utility fees from the vault (proportionally distributed)
-        const totalBeforeGas = V1 + V2 + V3 + wBTC;
-        if (totalBeforeGas > 0) {
-          const gasReduction = gasFeesPerWeek.weeklyTotal;
-          const utilityReduction = utilityFeePerWeek;
-          const totalReduction = gasReduction + utilityReduction;
-          const gasRatio = totalReduction / totalBeforeGas;
-          V1 -= V1 * gasRatio;
-          V2 -= V2 * gasRatio;
-          V3 -= V3 * gasRatio;
-          wBTC -= wBTC * gasRatio;
-        }
-      } else {
-        // Initial deposits
-        const D1 = weeklyDeposit * 0.10;
-        const D2 = weeklyDeposit * 0.60;
-        const D3 = weeklyDeposit * 0.30;
-        V1 = D1;
-        V2 = D2;
-        V3 = D3;
-      }
-
-      const totalValue = V1 + V2 + V3 + wBTC;
       
-      // Add data point for each year
-      if (week % weeksPerYear === 0) {
-        data.push({
-          year: Math.floor(week / weeksPerYear),
-          total: Math.round(totalValue),
-          strand1: Math.round(V1),
-          strand2: Math.round(V2),
-          strand3: Math.round(V3),
-          wbtc: Math.round(wBTC),
-          phase: phase2Triggered ? 2 : 1,
-          perMember: Math.round(totalValue / Math.max(parseInt(vaultStats.totalMembers) || 1, 1)),
-          cumulativeGasFees: Math.round(gasFeesPerWeek.weeklyTotal * week),
-          cumulativeUtilityFees: Math.round(utilityFeePerWeek * week)
-        });
-      }
+      setChartData(data);
+    } catch (error) {
+      console.error('Error running simulation:', error);
+      setChartData([]);
     }
-    
-    // Final conversion: dump remaining strands into wBTC at contract conclusion
-    if (data.length > 0) {
-      const finalData = data[data.length - 1];
-      const remainingStrands = finalData.strand1 + finalData.strand2 + finalData.strand3;
-      finalData.wbtc += remainingStrands;
-      finalData.strand1 = 0;
-      finalData.strand2 = 0;
-      finalData.strand3 = 0;
-      finalData.total = finalData.wbtc;
-    }
-    
-    setChartData(data);
   };
 
   useEffect(() => {

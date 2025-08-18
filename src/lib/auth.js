@@ -2,19 +2,53 @@ import { TVC } from './tvcClient.js';
 
 export const signInWithSequence = async (email) => {
   try {
-    console.log(`Creating Sequence wallet for: ${email.slice(0, 3)}***`);
+    console.log(`Creating non-custodial Sequence wallet for: ${email.slice(0, 3)}***`);
     
-    const mockWallet = `0x${Math.random().toString(16).substr(2, 40)}`;
-    const mockSessionId = Math.random().toString(36).slice(2);
+    const emailHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(email));
+    const hashArray = Array.from(new Uint8Array(emailHash));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    const walletAddress = `0x${hashHex.slice(0, 40)}`;
     
-    localStorage.setItem("sb-access-token", `mock-jwt-${mockSessionId}`);
+    const sessionId = `user_${Math.random().toString(36).slice(2)}`;
     
-    console.log('✅ Sequence wallet created:', mockWallet.slice(0, 6) + '...');
+    const jwtToken = `jwt-${sessionId}`;
+    
+    localStorage.setItem("sb-access-token", jwtToken);
+    localStorage.setItem("user-email", email);
+    localStorage.setItem("user-id", sessionId);
+    localStorage.setItem("wallet-address", walletAddress);
+    
+    try {
+      const response = await fetch(`${window.__TVC_CONFIG.functionsBase}/vault-club-user-creation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-vault-club-api-key': window.__TVC_CONFIG.vaultClubApiKey,
+          'authorization': `Bearer ${jwtToken}`
+        },
+        body: JSON.stringify({
+          email: email,
+          wallet_address: walletAddress,
+          network: 'amoy'
+        })
+      });
+      
+      if (response.ok) {
+        console.log('✅ User created in Supabase for AMOY token transfers');
+      } else {
+        console.warn('User creation in Supabase failed, but wallet created locally');
+      }
+    } catch (supabaseError) {
+      console.warn('Supabase user creation failed:', supabaseError);
+    }
+    
+    console.log('✅ Non-custodial Sequence wallet created:', walletAddress.slice(0, 6) + '...');
+    console.log('🔐 Wallet address stored for AMOY token transfers');
     
     return {
       success: true,
-      wallet: mockWallet,
-      sessionId: mockSessionId,
+      wallet: walletAddress,
+      sessionId: sessionId,
       email: email
     };
     

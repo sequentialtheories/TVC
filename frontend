@@ -87,28 +87,15 @@ const signInWithSequence = async (email) => {
     const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     const walletAddress = `0x${hashHex.slice(0, 40)}`;
     
-    // Real Supabase user creation via vault-club-user-creation endpoint
-    console.log('📧 Creating user in Supabase via vault-club-user-creation endpoint');
-    const response = await fetch(`${window.__TVC_CONFIG.functionsBase}/vault-club-user-creation`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-vault-club-api-key': window.__TVC_CONFIG.vaultClubApiKey
-      },
-      body: JSON.stringify({
-        email: email,
-        wallet_address: walletAddress,
-        network: 'amoy'
-      })
-    });
+    // Real Supabase user creation via direct auth signup
+    console.log('📧 Creating user in Supabase via direct auth signup');
+    const authResult = await signInWithSequence(email);
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`User creation failed: ${errorData.error || response.statusText}`);
+    if (!authResult.success) {
+      throw new Error(`User creation failed: ${authResult.error}`);
     }
     
-    const userData = await response.json();
-    console.log('✅ User created in Supabase:', userData);
+    console.log('✅ User created in Supabase:', authResult);
     
     // Create mock JWT token for authentication
     const mockToken = btoa(JSON.stringify({
@@ -124,30 +111,8 @@ const signInWithSequence = async (email) => {
     localStorage.setItem("user-id", userId);
     localStorage.setItem("wallet-address", walletAddress);
     
-    // Create user in Supabase for AMOY token transfers
-    try {
-      const userCreationResponse = await fetch(`${window.__TVC_CONFIG.functionsBase}/vault-club-user-creation`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-vault-club-api-key': window.__TVC_CONFIG.vaultClubApiKey,
-          'authorization': `Bearer ${accessToken}`
-        },
-        body: JSON.stringify({
-          email: email,
-          wallet_address: walletAddress,
-          network: 'amoy'
-        })
-      });
-      
-      if (userCreationResponse.ok) {
-        console.log('✅ User created in Supabase for AMOY token transfers');
-      } else {
-        console.warn('User creation in Supabase failed, but wallet created locally');
-      }
-    } catch (supabaseError) {
-      console.warn('Supabase user creation failed:', supabaseError);
-    }
+    // User already created via signInWithSequence above
+    console.log('✅ User created in Supabase for AMOY token transfers via direct auth signup');
     
     console.log('✅ Non-custodial Sequence wallet created:', walletAddress.slice(0, 6) + '...');
     console.log('🔐 Wallet address stored for AMOY token transfers');

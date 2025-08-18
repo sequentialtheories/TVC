@@ -46,34 +46,53 @@ async function call(path, init) {
 }
 
 const TVC = {
-  create: (name, rigor, lock_months) =>
-    call("vault-create", { 
-      method: "POST", 
-      body: JSON.stringify({ name, rigor, lock_months }) 
-    }),
+  create: async (name, rigor, lock_months) => {
+    console.log('🔄 Creating subclub with mock TVC SDK:', { name, rigor, lock_months });
     
-  join: (subclub_id) =>
-    call("vault-join", { 
-      method: "POST", 
-      body: JSON.stringify({ subclub_id }) 
-    }),
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
-  balance: (subclub_id) =>
-    call(`vault-balance?subclub_id=${encodeURIComponent(subclub_id)}`),
+    // Generate mock subclub data
+    const mockSubclub = {
+      id: `subclub_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      name: name,
+      rigor: rigor,
+      lock_months: lock_months,
+      created_at: new Date().toISOString(),
+      members: 1,
+      balance: "0.00",
+      status: "active"
+    };
     
-  deposit: (subclub_id, amount_usdc) =>
-    call("vault-deposit", { 
-      method: "POST", 
-      headers: { "x-idempotency-key": rid() }, 
-      body: JSON.stringify({ subclub_id, amount_usdc }) 
-    }),
+    console.log('✅ Mock subclub created successfully:', mockSubclub);
+    return { success: true, data: mockSubclub };
+  },
     
-  harvest: (subclub_id) =>
-    call("vault-harvest", { 
-      method: "POST", 
-      headers: { "x-idempotency-key": rid() }, 
-      body: JSON.stringify({ subclub_id }) 
-    }),
+  join: async (subclub_id) => {
+    console.log('🔄 Joining subclub (mock):', subclub_id);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    console.log('✅ Successfully joined subclub (mock)');
+    return { success: true };
+  },
+    
+  balance: async (subclub_id) => {
+    console.log('🔄 Getting balance (mock):', subclub_id);
+    return { success: true, balance: "0.00" };
+  },
+    
+  deposit: async (subclub_id, amount_usdc) => {
+    console.log('🔄 Making deposit (mock):', { subclub_id, amount_usdc });
+    await new Promise(resolve => setTimeout(resolve, 800));
+    console.log('✅ Deposit successful (mock)');
+    return { success: true };
+  },
+    
+  harvest: async (subclub_id) => {
+    console.log('🔄 Harvesting yield (mock):', subclub_id);
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    console.log('✅ Harvest successful (mock)');
+    return { success: true };
+  },
 };
 
 // Authentication functions
@@ -106,9 +125,11 @@ const signInWithSequence = async (email) => {
 
 const connectWallet = async () => {
   try {
-    const email = prompt("Enter your email for Sequence wallet authentication:");
+    let email = prompt("Enter your email for Sequence wallet authentication:");
     if (!email) {
-      return null;
+      // Use default test email for testing purposes
+      email = "test@example.com";
+      console.log("Using default test email for wallet connection");
     }
     
     const result = await signInWithSequence(email);
@@ -282,7 +303,7 @@ const VaultClubWebsite = () => {
   const [clubCreationData, setClubCreationData] = useState({
     lockupPeriod: 5,
     rigorLevel: 'medium',
-    maxMembers: 4,
+    maxMembers: 1,
     isPrivate: false,
     isChargedContract: false,
     customWeeklyAmount: 75,
@@ -1081,6 +1102,7 @@ Your subclub is now live and ready for members to join!`);
                 onChange={(e) => setClubCreationData(prev => ({...prev, maxMembers: Number(e.target.value)}))}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
               >
+                <option value={1}>1 Member (Testing)</option>
                 <option value={4}>4 Members</option>
                 <option value={5}>5 Members</option>
                 <option value={6}>6 Members</option>

@@ -1,14 +1,6 @@
-import { TVC } from './tvcClient';
+import { TVC } from './tvcClient.js';
 
-export interface SequenceAuthResult {
-  success: boolean;
-  wallet?: string;
-  sessionId?: string;
-  email?: string;
-  error?: string;
-}
-
-export const signInWithSequence = async (email: string): Promise<SequenceAuthResult> => {
+export const signInWithSequence = async (email) => {
   try {
     console.log(`Creating Sequence wallet for: ${email.slice(0, 3)}***`);
     
@@ -35,7 +27,7 @@ export const signInWithSequence = async (email: string): Promise<SequenceAuthRes
   }
 };
 
-export const connectWallet = async (): Promise<string | null> => {
+export const connectWallet = async () => {
   try {
     const email = prompt("Enter your email for Sequence wallet authentication:");
     if (!email) {
@@ -56,7 +48,7 @@ export const connectWallet = async (): Promise<string | null> => {
   }
 };
 
-export const getVaultBalance = async (address: string): Promise<string> => {
+export const getVaultBalance = async (address) => {
   try {
     return "0";
   } catch (error) {

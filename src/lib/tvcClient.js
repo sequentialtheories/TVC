@@ -1,5 +1,4 @@
-type Env = { functionsBase: string; vaultClubApiKey: string };
-const cfg = (): Env => (window as any).__TVC_CONFIG;
+const cfg = () => window.__TVC_CONFIG;
 
 const commonHeaders = () => ({
   "content-type": "application/json",
@@ -8,9 +7,9 @@ const commonHeaders = () => ({
     ? { "authorization": `Bearer ${localStorage.getItem("sb-access-token")}` } : {})
 });
 
-const rid = () => (crypto as any).randomUUID?.() || Math.random().toString(36).slice(2);
+const rid = () => crypto.randomUUID?.() || Math.random().toString(36).slice(2);
 
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
+async function call(path, init) {
   const res = await fetch(`${cfg().functionsBase}/${path}`, { 
     ...init, 
     headers: { ...commonHeaders(), ...(init?.headers || {}) } 
@@ -21,29 +20,29 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const TVC = {
-  create: (name: string, rigor: "LIGHT" | "MEDIUM" | "HEAVY", lock_months: number) =>
+  create: (name, rigor, lock_months) =>
     call("vault-create", { 
       method: "POST", 
       body: JSON.stringify({ name, rigor, lock_months }) 
     }),
     
-  join: (subclub_id: string) =>
+  join: (subclub_id) =>
     call("vault-join", { 
       method: "POST", 
       body: JSON.stringify({ subclub_id }) 
     }),
     
-  balance: (subclub_id: string) =>
+  balance: (subclub_id) =>
     call(`vault-balance?subclub_id=${encodeURIComponent(subclub_id)}`),
     
-  deposit: (subclub_id: string, amount_usdc: number) =>
+  deposit: (subclub_id, amount_usdc) =>
     call("vault-deposit", { 
       method: "POST", 
       headers: { "x-idempotency-key": rid() }, 
       body: JSON.stringify({ subclub_id, amount_usdc }) 
     }),
     
-  harvest: (subclub_id: string) =>
+  harvest: (subclub_id) =>
     call("vault-harvest", { 
       method: "POST", 
       headers: { "x-idempotency-key": rid() }, 

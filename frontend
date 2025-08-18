@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Database, Settings, User, Users, TrendingUp, Info, X, Bitcoin, DollarSign, Zap, Shield, ArrowLeft, Wallet, Home, Share2, MessageSquare, Heart, Reply, Plus, Filter, Search } from 'lucide-react';
+import { TVC } from './src/lib/tvcClient';
+import { connectWallet, getVaultBalance, getVaultStats } from './src/lib/auth';
 
 // Replace with your actual contract address and ABI
 const VAULT_CONTRACT_ADDRESS = "0xYourVaultContractAddressHere";
@@ -13,41 +15,7 @@ const VAULT_CONTRACT_ABI = [
   // Add other contract functions as needed
 ];
 
-// Connect wallet and return address or null
-async function connectWallet() {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return null;
-  }
-  try {
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-    return accounts[0];
-  } catch (error) {
-    console.error("Wallet connection rejected", error);
-    return null;
-  }
-}
 
-// Get vault balance for address - fallback version without ethers dependency
-async function getVaultBalance(address) {
-  // Since ethers may not be available, return mock data for now
-  // In production, implement proper Web3 calls
-  return "0";
-}
-
-// Get vault stats from contract - fallback version
-async function getVaultStats() {
-  // Return consistent mock data - if no real deposits, vault should be empty
-  return { 
-    totalMembers: 0, 
-    totalDeposits: "0", 
-    systemHealth: 100, 
-    transactions: 0,
-    strand1Balance: "0",
-    strand2Balance: "0",
-    strand3Balance: "0" 
-  };
-}
 
 // Get AAVE lending rates
 async function getAaveRates() {
@@ -107,37 +75,39 @@ async function getMemberAllocation() {
   return [];
 }
 
-// Deposit amount (in ether) to vault contract
-async function depositToVault(amountEther) {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return false;
-  }
+// Deposit amount (in USDC) to vault contract
+async function depositToVault(amountUsdc, subclubId) {
   try {
-    // Simulate deposit for demo purposes
-    console.log(`Depositing ${amountEther} to vault...`);
-    alert(`Demo mode: Automated deposit of ${amountEther} successful!`);
-    return true;
+    console.log(`Depositing ${amountUsdc} USDC to vault...`);
+    const result = await TVC.deposit(subclubId, amountUsdc);
+    if (result.success) {
+      console.log("Deposit successful:", result.data);
+      return true;
+    } else {
+      throw new Error(result.error || "Deposit failed");
+    }
   } catch (error) {
     console.error("Deposit failed:", error);
-    alert("Deposit transaction failed.");
+    alert(`Deposit transaction failed: ${error.message}`);
     return false;
   }
 }
 
 // Harvest and route yields
-async function harvestAndRoute() {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return false;
-  }
+async function harvestAndRoute(subclubId) {
   try {
-    // Simulate harvest for demo purposes
-    alert("Demo mode: Harvest simulation successful!");
-    return true;
+    console.log(`Harvesting yields for subclub ${subclubId}...`);
+    const result = await TVC.harvest(subclubId);
+    if (result.success) {
+      console.log("Harvest successful:", result.data);
+      alert(`Harvest successful! Total yield: ${result.data.total_yield_usdc} USDC`);
+      return true;
+    } else {
+      throw new Error(result.error || "Harvest failed");
+    }
   } catch (error) {
     console.error("Harvest failed:", error);
-    alert("Harvest transaction failed.");
+    alert(`Harvest transaction failed: ${error.message}`);
     return false;
   }
 }
@@ -299,31 +269,18 @@ const VaultClubWebsite = () => {
 
   useEffect(() => {
     const initializeWallet = async () => {
-      if (window.ethereum) {
-        try {
-          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-          if (accounts.length > 0) {
-            setWalletConnected(true);
-            setWalletAddress(accounts[0]);
-            const balance = await getVaultBalance(accounts[0]);
-            setVaultBalance(balance);
-          }
-          
-          window.ethereum.on('accountsChanged', async (accounts) => {
-            if (accounts.length === 0) {
-              setWalletConnected(false);
-              setWalletAddress(null);
-              setVaultBalance("0");
-            } else {
-              setWalletConnected(true);
-              setWalletAddress(accounts[0]);
-              const balance = await getVaultBalance(accounts[0]);
-              setVaultBalance(balance);
-            }
-          });
-        } catch (error) {
-          console.error("Error initializing wallet:", error);
+      try {
+        const storedToken = localStorage.getItem("sb-access-token");
+        const storedWallet = localStorage.getItem("wallet-address");
+        
+        if (storedToken && storedWallet) {
+          setWalletConnected(true);
+          setWalletAddress(storedWallet);
+          const balance = await getVaultBalance(storedWallet);
+          setVaultBalance(balance);
         }
+      } catch (error) {
+        console.error("Error initializing wallet:", error);
       }
     };
     initializeWallet();
@@ -632,6 +589,7 @@ const VaultClubWebsite = () => {
     if (address) {
       setWalletConnected(true);
       setWalletAddress(address);
+      localStorage.setItem("wallet-address", address);
       const balance = await getVaultBalance(address);
       setVaultBalance(balance);
     }
@@ -650,9 +608,10 @@ const VaultClubWebsite = () => {
     const weeklyAmount = calculateWeeklyDepositAmount();
     
     console.log("Debug deposit - Weekly amount:", weeklyAmount);
-    console.log("Debug deposit - User contracts:", deployedSubclubs.filter(club => 
+    const userContracts = deployedSubclubs.filter(club => 
       club.members && club.members.includes(walletAddress)
-    ));
+    );
+    console.log("Debug deposit - User contracts:", userContracts);
     
     if (weeklyAmount === 0) {
       alert("You must join at least one subclub before depositing.");
@@ -665,7 +624,14 @@ const VaultClubWebsite = () => {
       return;
     }
     
-    const success = await depositToVault(weeklyAmount);
+    // Use the first user contract for deposit (in production, this would be more sophisticated)
+    const primarySubclub = userContracts[0];
+    if (!primarySubclub) {
+      alert("Error: No contracts found for user. Please create or join a subclub first.");
+      return;
+    }
+    
+    const success = await depositToVault(weeklyAmount, primarySubclub.contractAddress);
     if (success) {
       console.log("Deposit successful, updating balances...");
       
@@ -821,52 +787,68 @@ const VaultClubWebsite = () => {
       return;
     }
     
-    // Generate a realistic contract address
-    const contractAddress = `0x${Math.random().toString(16).substr(2, 40)}`;
-    
-    // Assign a random color when creating the contract
-    const colors = [
-      'border-yellow-500',   
-      'border-green-500',   
-      'border-blue-500',    
-      'border-red-500',     
-      'border-purple-500',  
-      'border-orange-500',  
-      'border-pink-500',    
-      'border-indigo-500'   
-    ];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
-    
-    // Create new subclub object with assigned color
-    const newSubclub = {
-      id: Date.now(),
-      contractAddress,
-      creator: walletAddress,
-      maxMembers: clubCreationData.maxMembers,
-      lockupPeriod: clubCreationData.lockupPeriod,
-      rigorLevel: clubCreationData.rigorLevel,
-      isPrivate: clubCreationData.isPrivate,
-      isChargedContract: clubCreationData.isChargedContract,
-      currentMembers: 1, // Creator is first member
-      createdAt: new Date().toISOString(),
-      status: 'active',
-      totalDeposits: 0,
-      members: [walletAddress],
-      borderColor: randomColor, // Store the color with the contract
-      customWeeklyAmount: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customWeeklyAmount : undefined,
-      customSchedule: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customSchedule : undefined,
-      // Contract-specific strand balances
-      strand1Balance: "0",
-      strand2Balance: "0", 
-      strand3Balance: "0",
-      totalContractBalance: "0"
-    };
-    
-    // Add to deployed subclubs
-    setDeployedSubclubs(prev => [...prev, newSubclub]);
-    
-    // Success notification
-    alert(`✅ SubClub Contract Deployed Successfully!
+    try {
+      // Map rigor level to TVC SDK format
+      const rigorMapping = {
+        'light': 'LIGHT',
+        'medium': 'MEDIUM', 
+        'heavy': 'HEAVY',
+        'custom': 'MEDIUM' // Default custom to medium for now
+      };
+      
+      const rigor = rigorMapping[clubCreationData.rigorLevel] || 'MEDIUM';
+      const lockMonths = clubCreationData.isChargedContract ? clubCreationData.lockupPeriod : clubCreationData.lockupPeriod * 12;
+      const clubName = `Subclub-${Date.now()}`;
+      
+      console.log("Creating club with TVC SDK:", { name: clubName, rigor, lock_months: lockMonths });
+      
+      const result = await TVC.create(clubName, rigor, lockMonths);
+      
+      if (result.success) {
+        const contractAddress = result.data.subclub_id;
+        
+        // Assign a random color when creating the contract
+        const colors = [
+          'border-yellow-500',   
+          'border-green-500',   
+          'border-blue-500',    
+          'border-red-500',     
+          'border-purple-500',  
+          'border-orange-500',  
+          'border-pink-500',    
+          'border-indigo-500'   
+        ];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        
+        // Create new subclub object with assigned color
+        const newSubclub = {
+          id: Date.now(),
+          contractAddress,
+          creator: walletAddress,
+          maxMembers: clubCreationData.maxMembers,
+          lockupPeriod: clubCreationData.lockupPeriod,
+          rigorLevel: clubCreationData.rigorLevel,
+          isPrivate: clubCreationData.isPrivate,
+          isChargedContract: clubCreationData.isChargedContract,
+          currentMembers: 1,
+          createdAt: result.data.created_at,
+          status: 'active',
+          totalDeposits: 0,
+          members: [walletAddress],
+          borderColor: randomColor,
+          customWeeklyAmount: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customWeeklyAmount : undefined,
+          customSchedule: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customSchedule : undefined,
+          strand1Balance: "0",
+          strand2Balance: "0", 
+          strand3Balance: "0",
+          totalContractBalance: "0"
+        };
+        
+        // Add to deployed subclubs
+        setDeployedSubclubs(prev => [...prev, newSubclub]);
+        
+        // Success notification
+        alert(`✅ SubClub Contract Deployed Successfully!
 
 Contract Address: ${contractAddress}
 Contract Type: ${clubCreationData.isChargedContract ? 'Charged Contract' : 'Traditional Contract'}
@@ -877,8 +859,15 @@ Privacy: ${clubCreationData.isPrivate ? 'Private (invitation only)' : 'Public (v
 Utility Fee: ${clubCreationData.isChargedContract ? '$1.25' : '$1.00'}/user/week
 
 Your subclub is now live and ready for members to join!`);
-    
-    setActiveModal(null);
+        
+        setActiveModal(null);
+      } else {
+        throw new Error(result.error || "Failed to create subclub");
+      }
+    } catch (error) {
+      console.error("Club creation failed:", error);
+      alert(`Failed to create subclub: ${error.message}`);
+    }
   };
 
   const CreateClubModal = () => {    

@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Vault Club - Contract Simulation</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+      const { useState, useEffect } = React;
+      const { Database, Settings, User, Users, TrendingUp, Info, X, Bitcoin, DollarSign, Zap, Shield, ArrowLeft, Wallet, Home, Share2, MessageSquare, Heart, Reply, Plus, Filter, Search } = lucide;
+
+      // Mock wallet connection for simulation
+      async function connectWallet() {
+        const email = prompt("Enter your email for simulation:");
+        if (!email) return null;
+        
+        const mockAddress = `0x${Math.random().toString(16).substr(2, 40)}`;
+        console.log('✅ Mock wallet connected for simulation:', mockAddress);
+        return mockAddress;
+      }
+
+      // Get vault balance using mock data for simulation
+      async function getVaultBalance(subclub_id) {
+        try {
+          const result = await TVC.balance(subclub_id);
+          if (result.success && result.data) {
+            return result.data.per_user_share?.tvl_usdc_share || "0";
+          }
+          return "0";
+        } catch (error) {
+          console.error("Error fetching vault balance:", error);
+          return "0";
+        }
+      }
+
+      // Get vault stats using mock data for simulation
+      async function getVaultStats(subclub_id) {
+        try {
+          const result = await TVC.balance(subclub_id);
+          if (result.success && result.data) {
+            return {
+              totalMembers: result.data.member_count || 0,
+              totalDeposits: result.data.tvl_usdc || "0",
+              systemHealth: 100,
+              transactions: result.data.epoch_week || 0,
+              strand1Balance: result.data.p1_usdc || "0",
+              strand2Balance: result.data.p2_usdc || "0", 
+              strand3Balance: result.data.p3_usdc || "0"
+            };
+          }
+          return {
+            totalMembers: 0,
+            totalDeposits: "0", 
+            systemHealth: 100,
+            transactions: 0,
+            strand1Balance: "0",
+            strand2Balance: "0",
+            strand3Balance: "0"
+          };
+        } catch (error) {
+          console.error("Error fetching vault stats:", error);
+          return {
+            totalMembers: 0,
+            totalDeposits: "0",
+            systemHealth: 100, 
+            transactions: 0,
+            strand1Balance: "0",
+            strand2Balance: "0",
+            strand3Balance: "0"
+          };
+        }
+      }
+
+      // Mock TVC SDK for simulation
+      const TVC = {
+        create: async (name, rigor, lock_months) => {
+          console.log('Mock TVC.create:', { name, rigor, lock_months });
+          return {
+            success: true,
+            data: {
+              subclub_id: `mock-${Date.now()}`,
+              name,
+              rigor,
+              lock_months,
+              created_at: new Date().toISOString()
+            }
+          };
+        },
+        
+        balance: async (subclub_id) => {
+          console.log('Mock TVC.balance:', subclub_id);
+          return {
+            success: true,
+            data: {
+              epoch_week: 1,
+              tvl_usdc: "1000.00",
+              p1_usdc: "100.00",
+              p2_usdc: "600.00", 
+              p3_usdc: "300.00",
+              member_count: 1,
+              per_user_share: { tvl_usdc_share: "1000.00" }
+            }
+          };
+        },
+        
+        deposit: async (subclub_id, amount_usdc) => {
+          console.log('Mock TVC.deposit:', { subclub_id, amount_usdc });
+          return {
+            success: true,
+            data: {
+              transaction_id: `tx-${Date.now()}`,
+              new_tvl_usdc: (1000 + amount_usdc).toString(),
+              split: {
+                p1_amount: amount_usdc * 0.1,
+                p2_amount: amount_usdc * 0.6,
+                p3_amount: amount_usdc * 0.3
+              }
+            }
+          };
+        }
+      };
+
+      // Mock deposit to vault function for simulation
+      async function depositToVault(subclub_id, amountUSDC) {
+        try {
+          const result = await TVC.deposit(subclub_id, amountUSDC);
+          if (result.success) {
+            console.log('✅ Deposit successful:', result.data);
+            alert(`✅ Deposit successful: $${amountUSDC} USDC\n\nTransaction ID: ${result.data.transaction_id}\nNew TVL: $${result.data.new_tvl_usdc}`);
+            return true;
+          } else {
+            throw new Error(result.error || 'Deposit failed');
+          }
+        } catch (error) {
+          console.error("Deposit failed:", error);
+          alert(`Deposit failed: ${error.message}`);
+          return false;
+        }
+      }
+
+      // Mock functions for simulation
+      async function createVaultClub(name, rigor, lockMonths) {
+        console.log('Mock createVaultClub:', { name, rigor, lockMonths });
+        return `mock-contract-${Date.now()}`;
+      }
+
+      async function joinVaultClub(contractAddress) {
+        console.log('Mock joinVaultClub:', contractAddress);
+        return true;
+      }
+
+      async function harvestVault(contractAddress) {
+        console.log('Mock harvestVault:', contractAddress);
+        return true;
+      }
+
+      // Get AAVE lending rates
+      async function getAAVELendingRates() {
+        return {
+          USDC: 4.2,
+          WETH: 3.8,
+          WBTC: 2.1
+        };
+      }
+
+      // Get Quickswap LP rates
+      async function getQuickswapLPRates() {
+        return {
+          "USDC-WETH": 12.5,
+          "WETH-WBTC": 8.3,
+          "USDC-WMATIC": 15.2
+        };
+      }
+
+      // Get current BTC price
+      async function getBTCPrice() {
+        return 65000;
+      }
+
+      const VaultClubWebsite = () => {
+        const [currentPage, setCurrentPage] = useState('home');
+        const [walletConnected, setWalletConnected] = useState(false);
+        const [walletAddress, setWalletAddress] = useState('');
+        const [vaultStats, setVaultStats] = useState({
+          totalMembers: 0,
+          totalDeposits: "0",
+          systemHealth: 100,
+          transactions: 0,
+          strand1Balance: "0",
+          strand2Balance: "0",
+          strand3Balance: "0"
+        });
+        const [activeModal, setActiveModal] = useState(null);
+        const [activeStrand, setActiveStrand] = useState(null);
+        const [deployedSubclubs, setDeployedSubclubs] = useState([]);
+        const [selectedContract, setSelectedContract] = useState(null);
+        const [showCopiedBanner, setShowCopiedBanner] = useState(false);
+        const [clubCreationData, setClubCreationData] = useState({
+          rigorLevel: 'medium',
+          lockupPeriod: 1,
+          maxMembers: 8,
+          isPrivate: false,
+          isChargedContract: false,
+          customWeeklyAmount: 500,
+          customSchedule: 'weekly'
+        });
+
+        // Simulation parameters
+        const [apyStrand1, setApyStrand1] = useState(4.2);
+        const [apyStrand2, setApyStrand2] = useState(12.5);
+        const [apyStrand3, setApyStrand3] = useState(8.3);
+        const [btcPrice, setBtcPrice] = useState(65000);
+        const [simulationYears, setSimulationYears] = useState(3);
+        const [simulationRigor, setSimulationRigor] = useState('medium');
+        const [customSimulationAmount, setCustomSimulationAmount] = useState(500);
+        const [chartData, setChartData] = useState([]);
+
+        useEffect(() => {
+          const loadInitialData = async () => {
+            try {
+              const stats = await getVaultStats();
+              setVaultStats(stats);
+              
+              const aaveRates = await getAAVELendingRates();
+              const quickswapRates = await getQuickswapLPRates();
+              const currentBTCPrice = await getBTCPrice();
+              
+              setApyStrand1(aaveRates.USDC);
+              setApyStrand2(quickswapRates["USDC-WETH"]);
+              setApyStrand3(quickswapRates["WETH-WBTC"]);
+              setBtcPrice(currentBTCPrice);
+            } catch (error) {
+              console.error("Error loading initial data:", error);
+            }
+          };
+          
+          loadInitialData();
+        }, []);
+
+        // Calculate simulation data using RRL formula with dynamic APYs
+        const calculateSimulation = () => {
+          const data = [];
+          let V1 = 0, V2 = 0, V3 = 0, wBTC = 0;
+          const weeksPerYear = 52;
+          const totalWeeks = simulationYears * weeksPerYear;
+          
+          const r1 = apyStrand1 / 100 / weeksPerYear;
+          const r2 = apyStrand2 / 100 / weeksPerYear;
+          const r3 = apyStrand3 / 100 / weeksPerYear;
+          
+          const gasFeesPerWeek = {
+            weeklyTotal: 15,
+            strand1: 5,
+            strand2: 7,
+            strand3: 3
+          };
+          
+          const utilityFeePerWeek = 10;
+          
+          for (let week = 0; week <= totalWeeks; week++) {
+            const year = Math.floor(week / weeksPerYear) + 1;
+            const progressPercent = week / totalWeeks;
+            
+            // Phase 2 trigger: 50% completion OR ~$2M subclub value
+            const phase2Triggered = progressPercent >= 0.5 || (V1 + V2 + V3 + wBTC) >= 2000000;
+            
+            // Calculate weekly deposit based on selected rigor
+            let weeklyDeposit;
+            if (simulationRigor === 'light') {
+              weeklyDeposit = 250;
+            } else if (simulationRigor === 'medium') {
+              weeklyDeposit = 500;
+            } else if (simulationRigor === 'heavy') {
+              weeklyDeposit = 1000;
+            } else {
+              weeklyDeposit = customSimulationAmount;
+            }
+
+            if (week > 0) {
+              if (!phase2Triggered) {
+                // PHASE 1: Normal RRL operation
+                // Split deposits (10%, 60%, 30%) - correct allocation from documents
+                const D1 = weeklyDeposit * 0.10;
+                const D2 = weeklyDeposit * 0.60;
+                const D3 = weeklyDeposit * 0.30;
+                
+                // Calculate profits before routing
+                const P1 = V1 * r1;
+                const P2 = V2 * r2;
+                const P3 = V3 * r3;
+                
+                // Apply RRL routing: P1(50% reinvest, 40%→P2, 10%→P3), P2(50% reinvest, 40%→P3, 10%→P1), P3(70% reinvest, 20%→P1, 10%→P2)
+                V1 = V1 * (1 + r1) + D1 + 0.5 * P1 + 0.1 * P2 + 0.2 * P3 - gasFeesPerWeek.strand1;
+                V2 = V2 * (1 + r2) + D2 + 0.4 * P1 - 0.5 * P2;
+                V3 = V3 * (1 + r3) + D3 + 0.2 * P1 + 0.4 * P2 - 0.3 * P3;
+              } else {
+                // PHASE 2: Transition to wBTC
+                // All new deposits go to Strand 1 (AAVE Reserve)
+                V1 = V1 * (1 + r1) + weeklyDeposit;
+                V2 = V2 * (1 + r2);
+                V3 = V3 * (1 + r3);
+                
+                // Weekly BTC purchases with limits based on rigor level
+                let weeklyBTCPurchaseLimit;
+                if (simulationRigor === 'light') {
+                  weeklyBTCPurchaseLimit = 1000;
+                } else if (simulationRigor === 'medium') {
+                  weeklyBTCPurchaseLimit = 5000;
+                } else if (simulationRigor === 'heavy') {
+                  weeklyBTCPurchaseLimit = 10000;
+                } else {
+                  weeklyBTCPurchaseLimit = customSimulationAmount * 10;
+                }
+                
+                // Calculate available funds for BTC purchase
+                const totalAvailable = V1 + V2 + V3;
+                const btcPurchaseAmount = Math.min(weeklyBTCPurchaseLimit, totalAvailable * 0.1);
+                
+                if (btcPurchaseAmount > 0) {
+                  // Proportionally reduce strands for BTC purchase
+                  const reductionRatio = btcPurchaseAmount / totalAvailable;
+                  V1 -= V1 * reductionRatio;
+                  V2 -= V2 * reductionRatio;
+                  V3 -= V3 * reductionRatio;
+                  
+                  // Add to wBTC holdings
+                  wBTC += btcPurchaseAmount;
+                }
+              }
+              
+              // Apply weekly fees proportionally
+              const totalValue = V1 + V2 + V3 + wBTC;
+              if (totalValue > 0) {
+                const feeRatio = utilityFeePerWeek / totalValue;
+                V1 -= V1 * feeRatio;
+                V2 -= V2 * feeRatio;
+                V3 -= V3 * feeRatio;
+                wBTC -= wBTC * feeRatio;
+              }
+            }
+            
+            const totalValue = V1 + V2 + V3 + wBTC;
+            
+            // Add data point for each year
+            if (week % weeksPerYear === 0) {
+              data.push({
+                year: Math.floor(week / weeksPerYear),
+                total: Math.round(totalValue),
+                strand1: Math.round(V1),
+                strand2: Math.round(V2),
+                strand3: Math.round(V3),
+                wbtc: Math.round(wBTC),
+                phase: phase2Triggered ? 2 : 1,
+                perMember: Math.round(totalValue / Math.max(parseInt(vaultStats.totalMembers) || 1, 1)),
+                cumulativeGasFees: Math.round(gasFeesPerWeek.weeklyTotal * week),
+                cumulativeUtilityFees: Math.round(utilityFeePerWeek * week)
+              });
+            }
+          }
+          
+          // Final conversion: dump remaining strands into wBTC at contract conclusion
+          if (data.length > 0) {
+            const finalData = data[data.length - 1];
+            const remainingStrands = finalData.strand1 + finalData.strand2 + finalData.strand3;
+            finalData.wbtc += remainingStrands;
+            finalData.strand1 = 0;
+            finalData.strand2 = 0;
+            finalData.strand3 = 0;
+            finalData.total = finalData.wbtc;
+          }
+          
+          setChartData(data);
+        };
+
+        useEffect(() => {
+          calculateSimulation();
+        }, [apyStrand1, apyStrand2, apyStrand3, btcPrice, simulationYears, simulationRigor, customSimulationAmount, vaultStats.totalMembers]);
+
+        const closeModal = () => {
+          setActiveModal(null);
+          setActiveStrand(null);
+        };
+
+        const navigateTo = (page) => {
+          setCurrentPage(page);
+          setActiveModal(null);
+          setActiveStrand(null);
+        };
+
+        const handleConnectWallet = async () => {
+          const address = await connectWallet();
+          if (address) {
+            setWalletConnected(true);
+            setWalletAddress(address);
+            
+            const stats = await getVaultStats();
+            setVaultStats(stats);
+          }
+        };
+
+        const handleCreateClub = async () => {
+          if (!walletConnected) {
+            alert("Please connect your wallet first");
+            return;
+          }
+          
+          try {
+            const rigorMap = {
+              'light': 'LIGHT',
+              'medium': 'MEDIUM', 
+              'heavy': 'HEAVY'
+            };
+            
+            const result = await TVC.create(
+              `${clubCreationData.rigorLevel} Rigor Contract`,
+              rigorMap[clubCreationData.rigorLevel] || 'MEDIUM',
+              clubCreationData.lockupPeriod
+            );
+            
+            if (result.success && result.data) {
+              const contractAddress = result.data.subclub_id;
+              
+              // Assign a random color when creating the contract
+              const colors = [
+                'border-yellow-500', 'border-green-500', 'border-blue-500', 'border-red-500',
+                'border-purple-500', 'border-orange-500', 'border-pink-500', 'border-indigo-500'
+              ];
+              const randomColor = colors[Math.floor(Math.random() * colors.length)];
+              
+              // Create new subclub object
+              const newSubclub = {
+                id: Date.now(),
+                contractAddress,
+                creator: walletAddress,
+                maxMembers: clubCreationData.maxMembers,
+                lockupPeriod: clubCreationData.lockupPeriod,
+                rigorLevel: clubCreationData.rigorLevel,
+                isPrivate: clubCreationData.isPrivate,
+                isChargedContract: clubCreationData.isChargedContract,
+                currentMembers: 1,
+                createdAt: result.data.created_at,
+                status: 'active',
+                totalDeposits: 0,
+                members: [walletAddress],
+                borderColor: randomColor,
+                customWeeklyAmount: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customWeeklyAmount : undefined,
+                customSchedule: clubCreationData.rigorLevel === 'custom' ? clubCreationData.customSchedule : undefined,
+                strand1Balance: "0",
+                strand2Balance: "0", 
+                strand3Balance: "0",
+                totalContractBalance: "0"
+              };
+              
+              setDeployedSubclubs(prev => [...prev, newSubclub]);
+              
+              alert(`✅ SubClub Contract Created Successfully!
+
+Contract ID: ${contractAddress}
+Contract Type: ${clubCreationData.isChargedContract ? 'Charged Contract' : 'Traditional Contract'}
+Max Members: ${clubCreationData.maxMembers}
+Lockup Period: ${clubCreationData.lockupPeriod} ${clubCreationData.isChargedContract ? 'month' : 'year'}${clubCreationData.lockupPeriod === 1 ? '' : 's'}
+Investment Rigor: ${clubCreationData.rigorLevel.charAt(0).toUpperCase() + clubCreationData.rigorLevel.slice(1)}
+Privacy: ${clubCreationData.isPrivate ? 'Private (invitation only)' : 'Public (visible to all)'}
+
+Your subclub simulation is now ready for testing!`);
+              
+              setActiveModal(null);
+            } else {
+              throw new Error(result.error || 'Failed to create contract');
+            }
+          } catch (error) {
+            console.error("Error creating contract:", error);
+            alert(`Failed to create contract: ${error.message}`);
+          }
+        };
+
+        const handleDeposit = async () => {
+          if (!selectedContract) {
+            alert("Please select a contract first");
+            return;
+          }
+          
+          if (!walletConnected) {
+            alert("Please connect your wallet first");
+            return;
+          }
+          
+          // Calculate weekly deposit amount based on rigor level
+          let weeklyAmount;
+          if (selectedContract.rigorLevel === 'light') {
+            weeklyAmount = 250;
+          } else if (selectedContract.rigorLevel === 'medium') {
+            weeklyAmount = 500;
+          } else if (selectedContract.rigorLevel === 'heavy') {
+            weeklyAmount = 1000;
+          } else if (selectedContract.rigorLevel === 'custom') {
+            weeklyAmount = selectedContract.customWeeklyAmount || 500;
+          } else {
+            weeklyAmount = 500;
+          }
+          
+          const success = await depositToVault(selectedContract?.contractAddress, weeklyAmount);
+          
+          if (success) {
+            // Update local state to reflect the deposit
+            setDeployedSubclubs(prev => prev.map(club => {
+              if (club.contractAddress === selectedContract.contractAddress) {
+                const updatedClub = { ...club };
+                updatedClub.totalDeposits += weeklyAmount;
+                
+                // Split deposit according to RRL (10%, 60%, 30%)
+                const strand1Addition = weeklyAmount * 0.10;
+                const strand2Addition = weeklyAmount * 0.60;
+                const strand3Addition = weeklyAmount * 0.30;
+                
+                updatedClub.strand1Balance = (parseFloat(updatedClub.strand1Balance) + strand1Addition).toString();
+                updatedClub.strand2Balance = (parseFloat(updatedClub.strand2Balance) + strand2Addition).toString();
+                updatedClub.strand3Balance = (parseFloat(updatedClub.strand3Balance) + strand3Addition).toString();
+                updatedClub.totalContractBalance = (parseFloat(updatedClub.totalContractBalance) + weeklyAmount).toString();
+                
+                return updatedClub;
+              }
+              return club;
+            }));
+            
+            // Update selected contract
+            if (selectedContract) {
+              const updatedContract = { ...selectedContract };
+              updatedContract.totalDeposits += weeklyAmount;
+              
+              const strand1Addition = weeklyAmount * 0.10;
+              const strand2Addition = weeklyAmount * 0.60;
+              const strand3Addition = weeklyAmount * 0.30;
+              
+              updatedContract.strand1Balance = (parseFloat(updatedContract.strand1Balance) + strand1Addition).toString();
+              updatedContract.strand2Balance = (parseFloat(updatedContract.strand2Balance) + strand2Addition).toString();
+              updatedContract.strand3Balance = (parseFloat(updatedContract.strand3Balance) + strand3Addition).toString();
+              updatedContract.totalContractBalance = (parseFloat(updatedContract.totalContractBalance) + weeklyAmount).toString();
+              
+              setSelectedContract(updatedContract);
+            }
+            
+            // Update vault stats
+            const newStats = { ...vaultStats };
+            newStats.totalDeposits = (parseFloat(newStats.totalDeposits) + weeklyAmount).toString();
+            newStats.strand1Balance = (parseFloat(newStats.strand1Balance) + weeklyAmount * 0.10).toString();
+            newStats.strand2Balance = (parseFloat(newStats.strand2Balance) + weeklyAmount * 0.60).toString();
+            newStats.strand3Balance = (parseFloat(newStats.strand3Balance) + weeklyAmount * 0.30).toString();
+            setVaultStats(newStats);
+          }
+        };
+
+        // Home Page Component
+        const HomePage = () => (
+          <div className="container mx-auto px-6 py-8 pb-20">
+            <div className="text-center mb-12">
+              <h1 className="text-4xl md:text-6xl font-bold text-slate-800 mb-4">
+                The Vault Club
+              </h1>
+              <p className="text-xl text-slate-600 mb-8 max-w-3xl mx-auto">
+                Decentralized Investment Contracts with Risk-Reward Ladder Algorithm
+              </p>
+              
+              {!walletConnected ? (
+                <button 
+                  onClick={handleConnectWallet}
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
+                >
+                  <Wallet className="w-6 h-6 inline mr-2" />
+                  Connect Wallet to Start Simulation
+                </button>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg inline-block">
+                    <span className="font-semibold">✅ Wallet Connected:</span> {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                  </div>
+                  <div>
+                    <button 
+                      onClick={() => setActiveModal('createClub')}
+                      className="bg-gradient-to-r from-green-600 to-teal-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:from-green-700 hover:to-teal-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 mr-4"
+                    >
+                      <Plus className="w-6 h-6 inline mr-2" />
+                      Create New Contract
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Vault Statistics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">Total Members</p>
+                    <p className="text-2xl font-bold text-slate-800">{vaultStats.totalMembers}</p>
+                  </div>
+                  <Users className="w-8 h-8 text-indigo-600" />
+                </div>
+              </div>
+              
+              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">Total Deposits</p>
+                    <p className="text-2xl font-bold text-slate-800">${parseFloat(vaultStats.totalDeposits).toLocaleString()}</p>
+                  </div>
+                  <DollarSign className="w-8 h-8 text-green-600" />
+                </div>
+              </div>
+              
+              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">System Health</p>
+                    <p className="text-2xl font-bold text-slate-800">{vaultStats.systemHealth}%</p>
+                  </div>
+                  <Shield className="w-8 h-8 text-blue-600" />
+                </div>
+              </div>
+              
+              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-600">Transactions</p>
+                    <p className="text-2xl font-bold text-slate-800">{vaultStats.transactions}</p>
+                  </div>
+                  <TrendingUp className="w-8 h-8 text-purple-600" />
+                </div>
+              </div>
+            </div>
+
+            {/* Deployed Subclubs */}
+            {deployedSubclubs.length > 0 && (
+              <div className="mb-12">
+                <h2 className="text-2xl font-bold text-slate-800 mb-6">Your Contracts</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {deployedSubclubs.map((subclub) => (
+                    <div key={subclub.id} className={`bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg border-2 ${subclub.borderColor} cursor-pointer hover:shadow-xl transition-all duration-300`}
+                         onClick={() => setSelectedContract(subclub)}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-slate-800">
+                          {subclub.rigorLevel.charAt(0).toUpperCase() + subclub.rigorLevel.slice(1)} Contract
+                        </h3>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          subclub.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {subclub.status}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-2 text-sm text-slate-600">
+                        <p><span className="font-medium">Contract ID:</span> {subclub.contractAddress.slice(0, 8)}...</p>
+                        <p><span className="font-medium">Members:</span> {subclub.currentMembers}/{subclub.maxMembers}</p>
+                        <p><span className="font-medium">Lockup:</span> {subclub.lockupPeriod} {subclub.isChargedContract ? 'month' : 'year'}{subclub.lockupPeriod === 1 ? '' : 's'}</p>
+                        <p><span className="font-medium">Total Deposits:</span> ${subclub.totalDeposits.toLocaleString()}</p>
+                      </div>
+                      
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedContract(subclub);
+                            handleDeposit();
+                          }}
+                          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:from-blue-700 hover:to-indigo-700 transition-all duration-300"
+                        >
+                          Make Deposit
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+        // Future Simulation Page Component
+        const FutureSimulationPage = () => (
+          <div className="container mx-auto px-6 py-8 pb-20">
+            <div className="text-center mb-8">
+              <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">
+                Future Simulation & wBTC Accumulation
+              </h1>
+              <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+                Project your investment growth with Phase 2 Bitcoin accumulation strategy
+              </p>
+            </div>
+
+            {/* Simulation Controls */}
+            <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg mb-8">
+              <h2 className="text-xl font-bold text-slate-800 mb-4">Simulation Parameters</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Investment Rigor</label>
+                  <select 
+                    value={simulationRigor} 
+                    onChange={(e) => setSimulationRigor(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  >
+                    <option value="light">Light ($250/week)</option>
+                    <option value="medium">Medium ($500/week)</option>
+                    <option value="heavy">Heavy ($1000/week)</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Simulation Years</label>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max="10" 
+                    value={simulationYears}
+                    onChange={(e) => setSimulationYears(parseInt(e.target.value))}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">BTC Price ($)</label>
+                  <input 
+                    type="number" 
+                    min="10000" 
+                    max="200000" 
+                    step="1000"
+                    value={btcPrice}
+                    onChange={(e) => setBtcPrice(parseInt(e.target.value))}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Strand 2 APY (%)</label>
+                  <input 
+                    type="number" 
+                    min="0" 
+                    max="50" 
+                    step="0.1"
+                    value={apyStrand2}
+                    onChange={(e) => setApyStrand2(parseFloat(e.target.value))}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Simulation Results */}
+            {chartData.length > 0 && (
+              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg">
+                <h2 className="text-xl font-bold text-slate-800 mb-4">Projection Results</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                  <div className="bg-gradient-to-r from-blue-100 to-indigo-100 p-4 rounded-lg border-l-4 border-blue-500">
+                    <h3 className="font-semibold text-blue-700 mb-1">Total Final Value</h3>
+                    <div className="text-2xl font-bold text-blue-800">
+                      ${chartData[chartData.length - 1]?.total?.toLocaleString() || 0}
+                    </div>
+                    <div className="text-blue-600 text-sm">
+                      After {simulationYears} years
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-r from-green-100 to-emerald-100 p-4 rounded-lg border-l-4 border-green-500">
+                    <h3 className="font-semibold text-green-700 mb-1">Phase 2 Trigger</h3>
+                    <div className="text-2xl font-bold text-green-800">
+                      Year {chartData.find(d => d.phase === 2)?.year || 'N/A'}
+                    </div>
+                    <div className="text-green-600 text-sm">
+                      Bitcoin accumulation starts
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-r from-orange-100 to-amber-100 p-4 rounded-lg border-l-4 border-orange-500">
+                    <h3 className="font-semibold text-orange-700 mb-1">wBTC Accumulation - Phase 2</h3>
+                    <div className="text-2xl font-bold text-orange-800">
+                      {chartData[chartData.length - 1]?.wbtc ? 
+                        (chartData[chartData.length - 1].wbtc / btcPrice).toFixed(3) : 0}₿
+                    </div>
+                    <div className="text-orange-600 text-sm">
+                      Final Bitcoin holdings (${chartData[chartData.length - 1]?.wbtc?.toLocaleString() || 0})
+                    </div>
+                  </div>
+                </div>
+
+                {/* Year by Year Breakdown */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Year</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Phase</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Total Value</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Strand 1</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Strand 2</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Strand 3</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">wBTC</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {chartData.map((data, index) => (
+                        <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-2 px-4">{data.year}</td>
+                          <td className="py-2 px-4">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              data.phase === 1 ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'
+                            }`}>
+                              Phase {data.phase}
+                            </span>
+                          </td>
+                          <td className="py-2 px-4 font-medium">${data.total?.toLocaleString()}</td>
+                          <td className="py-2 px-4">${data.strand1?.toLocaleString()}</td>
+                          <td className="py-2 px-4">${data.strand2?.toLocaleString()}</td>
+                          <td className="py-2 px-4">${data.strand3?.toLocaleString()}</td>
+                          <td className="py-2 px-4 font-medium text-orange-600">
+                            {data.wbtc > 0 ? `${(data.wbtc / btcPrice).toFixed(3)}₿` : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+        // Create Club Modal Component
+        const CreateClubModal = () => {    
+          return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl max-h-[90vh] overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 rounded-t-2xl text-white">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-xl font-bold">Create New SubClub Contract</h3>
+                      <p className="text-white/80">Deploy smart contract with mega vault system</p>
+                    </div>
+                    <button onClick={closeModal} className="text-white/80 hover:text-white">
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="overflow-y-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+                  <div className="p-6 space-y-6">
+                  
+                  {/* Investment Rigor */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Investment Rigor Level
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['light', 'medium', 'heavy'].map((rigor) => (
+                        <button
+                          key={rigor}
+                          onClick={() => setClubCreationData(prev => ({ ...prev, rigorLevel: rigor }))}
+                          className={`p-3 rounded-lg border-2 text-center transition-all duration-200 ${
+                            clubCreationData.rigorLevel === rigor
+                              ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                          }`}
+                        >
+                          <div className="font-medium capitalize">{rigor}</div>
+                          <div className="text-xs mt-1">
+                            {rigor === 'light' && '$250/week'}
+                            {rigor === 'medium' && '$500/week'}
+                            {rigor === 'heavy' && '$1000/week'}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Lockup Period */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Lockup Period
+                    </label>
+                    <select 
+                      value={clubCreationData.lockupPeriod}
+                      onChange={(e) => setClubCreationData(prev => ({ ...prev, lockupPeriod: parseInt(e.target.value) }))}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    >
+                      <option value={1}>1 Year</option>
+                      <option value={2}>2 Years</option>
+                      <option value={3}>3 Years</option>
+                      <option value={5}>5 Years</option>
+                    </select>
+                  </div>
+
+                  {/* Max Members */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Maximum Members
+                    </label>
+                    <select 
+                      value={clubCreationData.maxMembers}
+                      onChange={(e) => setClubCreationData(prev => ({ ...prev, maxMembers: parseInt(e.target.value) }))}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    >
+                      <option value={4}>4 Members</option>
+                      <option value={6}>6 Members</option>
+                      <option value={8}>8 Members</option>
+                    </select>
+                  </div>
+
+                  {/* Privacy Setting */}
+                  <div>
+                    <label className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        checked={clubCreationData.isPrivate}
+                        onChange={(e) => setClubCreationData(prev => ({ ...prev, isPrivate: e.target.checked }))}
+                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700">Private Contract (invitation only)</span>
+                    </label>
+                  </div>
+
+                  </div>
+                </div>
+                
+                <div className="p-6 bg-gray-50 rounded-b-2xl">
+                  <button 
+                    onClick={handleCreateClub}
+                    className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-6 rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+                  >
+                    Create SubClub Contract
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        return (
+          <div className="min-h-screen bg-gradient-to-br from-teal-50/50 via-teal-50/30 to-teal-100/40" style={{backgroundColor: '#edfffe'}}>
+            {/* Header */}
+            <header className="relative z-20 bg-white/30 backdrop-blur-md border-b border-white/20 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="text-2xl font-bold text-black">
+                      The Vault Club - Simulation
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-4">
+                  <nav className="hidden md:flex space-x-2">
+                    <button 
+                      onClick={() => navigateTo('home')}
+                      className={`p-3 rounded-full transition-all duration-300 ${
+                        currentPage === 'home' 
+                          ? 'bg-indigo-600 text-white shadow-lg' 
+                          : 'bg-white/60 text-slate-600 hover:bg-white/80 shadow-sm'
+                      }`}
+                      title="Home"
+                    >
+                      <Home className="w-5 h-5" />
+                    </button>
+                    <button 
+                      onClick={() => navigateTo('simulation')}
+                      className={`p-3 rounded-full transition-all duration-300 ${
+                        currentPage === 'simulation' 
+                          ? 'bg-indigo-600 text-white shadow-lg' 
+                          : 'bg-white/60 text-slate-600 hover:bg-white/80 shadow-sm'
+                      }`}
+                      title="Future Simulation"
+                    >
+                      <TrendingUp className="w-5 h-5" />
+                    </button>
+                  </nav>
+                </div>
+              </div>
+            </header>
+
+            {/* Main Content */}
+            <main className="relative">
+              {currentPage === 'home' && <HomePage />}
+              {currentPage === 'simulation' && <FutureSimulationPage />}
+            </main>
+
+            {/* Create Club Modal */}
+            {activeModal === 'createClub' && <CreateClubModal />}
+          </div>
+        );
+      };
+
+      ReactDOM.render(React.createElement(VaultClubWebsite), document.getElementById('root'));
+    </script>
+</body>
+</html>

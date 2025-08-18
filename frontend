@@ -1,52 +1,93 @@
 import React, { useState, useEffect } from 'react';
 import { Database, Settings, User, Users, TrendingUp, Info, X, Bitcoin, DollarSign, Zap, Shield, ArrowLeft, Wallet, Home, Share2, MessageSquare, Heart, Reply, Plus, Filter, Search } from 'lucide-react';
 
-// Replace with your actual contract address and ABI
-const VAULT_CONTRACT_ADDRESS = "0xYourVaultContractAddressHere";
-const VAULT_CONTRACT_ABI = [
-  "function balanceOf(address) view returns (uint256)",
-  "function deposit(uint256 amount) external",
-  "function harvestAndRoute() external",
-  "function getTotalMembers() view returns (uint256)",
-  "function getMemberInfo(address) view returns (uint256, uint256, bool)",
-  "function getVaultStats() view returns (uint256, uint256, uint256, uint256)",
-  // Add other contract functions as needed
-];
+// TVC SDK Integration - Real backend connection
+import { TVC } from './src/lib/tvcClient.js';
+import { signInWithSequence, submitOtpCode } from './src/lib/sequenceAuth.js';
 
-// Connect wallet and return address or null
+// Connect wallet using Sequence WaaS (non-custodial)
 async function connectWallet() {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return null;
-  }
+  const email = prompt("Enter your email to create/access your non-custodial Sequence wallet:");
+  if (!email) return null;
+  
   try {
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-    return accounts[0];
+    const result = await signInWithSequence(email);
+    if (!result.success) {
+      alert(`Wallet connection failed: ${result.error}`);
+      return null;
+    }
+    
+    // Handle OTP if required
+    if (result.otpResolver) {
+      const otpCode = prompt("Enter the verification code sent to your email:");
+      if (otpCode) {
+        const otpResult = await submitOtpCode(result.otpResolver, otpCode);
+        if (!otpResult.success) {
+          alert(`OTP verification failed: ${otpResult.error}`);
+          return null;
+        }
+      }
+    }
+    
+    console.log('✅ Connected to non-custodial Sequence wallet:', result.wallet);
+    return result.wallet;
   } catch (error) {
-    console.error("Wallet connection rejected", error);
+    console.error("Wallet connection error:", error);
+    alert("Failed to connect wallet. Please try again.");
     return null;
   }
 }
 
-// Get vault balance for address - fallback version without ethers dependency
-async function getVaultBalance(address) {
-  // Since ethers may not be available, return mock data for now
-  // In production, implement proper Web3 calls
-  return "0";
+// Get vault balance using TVC SDK
+async function getVaultBalance(subclub_id) {
+  try {
+    const result = await TVC.balance(subclub_id);
+    if (result.success && result.data) {
+      return result.data.per_user_share?.tvl_usdc_share || "0";
+    }
+    return "0";
+  } catch (error) {
+    console.error("Error fetching vault balance:", error);
+    return "0";
+  }
 }
 
-// Get vault stats from contract - fallback version
-async function getVaultStats() {
-  // Return consistent mock data - if no real deposits, vault should be empty
-  return { 
-    totalMembers: 0, 
-    totalDeposits: "0", 
-    systemHealth: 100, 
-    transactions: 0,
-    strand1Balance: "0",
-    strand2Balance: "0",
-    strand3Balance: "0" 
-  };
+// Get vault stats using TVC SDK
+async function getVaultStats(subclub_id) {
+  try {
+    const result = await TVC.balance(subclub_id);
+    if (result.success && result.data) {
+      return {
+        totalMembers: result.data.member_count || 0,
+        totalDeposits: result.data.tvl_usdc || "0",
+        systemHealth: 100,
+        transactions: result.data.epoch_week || 0,
+        strand1Balance: result.data.p1_usdc || "0",
+        strand2Balance: result.data.p2_usdc || "0", 
+        strand3Balance: result.data.p3_usdc || "0"
+      };
+    }
+    return {
+      totalMembers: 0,
+      totalDeposits: "0", 
+      systemHealth: 100,
+      transactions: 0,
+      strand1Balance: "0",
+      strand2Balance: "0",
+      strand3Balance: "0"
+    };
+  } catch (error) {
+    console.error("Error fetching vault stats:", error);
+    return {
+      totalMembers: 0,
+      totalDeposits: "0",
+      systemHealth: 100, 
+      transactions: 0,
+      strand1Balance: "0",
+      strand2Balance: "0",
+      strand3Balance: "0"
+    };
+  }
 }
 
 // Get AAVE lending rates
@@ -107,37 +148,37 @@ async function getMemberAllocation() {
   return [];
 }
 
-// Deposit amount (in ether) to vault contract
-async function depositToVault(amountEther) {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return false;
-  }
+async function depositToVault(subclub_id, amountUSDC) {
   try {
-    // Simulate deposit for demo purposes
-    console.log(`Depositing ${amountEther} to vault...`);
-    alert(`Demo mode: Automated deposit of ${amountEther} successful!`);
-    return true;
+    const result = await TVC.deposit(subclub_id, amountUSDC);
+    if (result.success) {
+      console.log('✅ Deposit successful:', result.data);
+      alert(`✅ Deposit successful: $${amountUSDC} USDC\n\nTransaction ID: ${result.data.transaction_id}\nNew TVL: $${result.data.new_tvl_usdc}`);
+      return true;
+    } else {
+      throw new Error(result.error || 'Deposit failed');
+    }
   } catch (error) {
     console.error("Deposit failed:", error);
-    alert("Deposit transaction failed.");
+    alert(`Deposit failed: ${error.message}`);
     return false;
   }
 }
 
 // Harvest and route yields
-async function harvestAndRoute() {
-  if (!window.ethereum) {
-    alert("MetaMask is required to use this app.");
-    return false;
-  }
+async function harvestAndRoute(subclub_id) {
   try {
-    // Simulate harvest for demo purposes
-    alert("Demo mode: Harvest simulation successful!");
-    return true;
+    const result = await TVC.harvest(subclub_id);
+    if (result.success) {
+      console.log('✅ Harvest successful:', result.data);
+      alert(`✅ Harvest successful!\n\nProfit distributed according to RRL algorithm`);
+      return true;
+    } else {
+      throw new Error(result.error || 'Harvest failed');
+    }
   } catch (error) {
     console.error("Harvest failed:", error);
-    alert("Harvest transaction failed.");
+    alert(`Harvest failed: ${error.message}`);
     return false;
   }
 }
@@ -665,7 +706,7 @@ const VaultClubWebsite = () => {
       return;
     }
     
-    const success = await depositToVault(weeklyAmount);
+    const success = await depositToVault(selectedContract?.contractAddress, weeklyAmount);
     if (success) {
       console.log("Deposit successful, updating balances...");
       
@@ -821,8 +862,24 @@ const VaultClubWebsite = () => {
       return;
     }
     
-    // Generate a realistic contract address
-    const contractAddress = `0x${Math.random().toString(16).substr(2, 40)}`;
+    try {
+      const rigorMap = {
+        'light': 'LIGHT',
+        'medium': 'MEDIUM', 
+        'heavy': 'HEAVY'
+      };
+      
+      const result = await TVC.create(
+        `${clubCreationData.rigorLevel} Rigor Contract`,
+        rigorMap[clubCreationData.rigorLevel] || 'MEDIUM',
+        clubCreationData.lockupPeriod
+      );
+      
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Failed to create contract');
+      }
+      
+      const contractAddress = result.data.subclub_id;
     
     // Assign a random color when creating the contract
     const colors = [
@@ -862,23 +919,24 @@ const VaultClubWebsite = () => {
       totalContractBalance: "0"
     };
     
-    // Add to deployed subclubs
     setDeployedSubclubs(prev => [...prev, newSubclub]);
     
-    // Success notification
-    alert(`✅ SubClub Contract Deployed Successfully!
+    alert(`✅ SubClub Contract Created Successfully!
 
-Contract Address: ${contractAddress}
+Contract ID: ${contractAddress}
 Contract Type: ${clubCreationData.isChargedContract ? 'Charged Contract' : 'Traditional Contract'}
 Max Members: ${clubCreationData.maxMembers}
 Lockup Period: ${clubCreationData.lockupPeriod} ${clubCreationData.isChargedContract ? 'month' : 'year'}${clubCreationData.lockupPeriod === 1 ? '' : 's'}
 Investment Rigor: ${clubCreationData.rigorLevel.charAt(0).toUpperCase() + clubCreationData.rigorLevel.slice(1)}
 Privacy: ${clubCreationData.isPrivate ? 'Private (invitation only)' : 'Public (visible to all)'}
-Utility Fee: ${clubCreationData.isChargedContract ? '$1.25' : '$1.00'}/user/week
 
-Your subclub is now live and ready for members to join!`);
+Your subclub simulation is now ready for testing!`);
     
     setActiveModal(null);
+    } catch (error) {
+      console.error("Error creating contract:", error);
+      alert(`Failed to create contract: ${error.message}`);
+    }
   };
 
   const CreateClubModal = () => {    

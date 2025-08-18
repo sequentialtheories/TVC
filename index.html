@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Vault Club - DeFi Investment Contracts</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://unpkg.com/@0xsequence/waas@latest/dist/index.umd.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <!-- TVC Configuration -->
+    <script>
+      window.__TVC_CONFIG = window.__TVC_CONFIG || {};
+      window.__TVC_CONFIG.functionsBase = "https://qldjhlnsphlixmzzrdwi.supabase.co/functions/v1";
+      window.__TVC_CONFIG.vaultClubApiKey = "vault-club-api-key-placeholder"; // Replace with actual key
+    </script>
+    
+    <!-- TVC SDK -->
+    <script type="text/babel" src="src/lib/tvcClient.js"></script>
+    <script type="text/babel" src="src/lib/sequenceAuth.js"></script>
+    
+    <!-- Main Application -->
+    <script type="text/babel" src="frontend"></script>
+</body>
+</html>

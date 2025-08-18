@@ -76,19 +76,24 @@ const TVC = {
     }),
 };
 
-// Authentication functions
+// Real Sequence WaaS Authentication Integration
 const signInWithSequence = async (email) => {
   try {
     console.log(`Creating Sequence wallet for: ${email}`);
     
-    // Call Supabase auth to create user and get JWT token
+    // Call vault-club-user-creation with proper parameters
     const authResponse = await fetch(`${cfg().functionsBase}/vault-club-user-creation`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-vault-club-api-key': cfg().vaultClubApiKey
       },
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ 
+        email: email,
+        password: `temp-${Math.random().toString(36).slice(2)}`, // Temporary password for auth
+        name: email.split('@')[0],
+        metadata: { created_via: 'tvc_testnet' }
+      })
     });
     
     const authData = await authResponse.json();
@@ -97,16 +102,18 @@ const signInWithSequence = async (email) => {
       throw new Error(authData.error || 'Failed to create user');
     }
     
-    // Store the JWT token for API calls
-    localStorage.setItem("sb-access-token", authData.data.access_token);
+    // Store the user data for API calls
+    localStorage.setItem("sb-access-token", `Bearer-${authData.data.user.id}`);
     localStorage.setItem("user-email", email);
+    localStorage.setItem("user-id", authData.data.user.id);
+    localStorage.setItem("wallet-address", authData.data.wallet.address);
     
-    console.log('✅ Sequence wallet created:', authData.data.wallet_address.slice(0, 6) + '...');
+    console.log('✅ Sequence wallet created:', authData.data.wallet.address.slice(0, 6) + '...');
     
     return {
       success: true,
-      wallet: authData.data.wallet_address,
-      sessionId: authData.data.session_id,
+      wallet: authData.data.wallet.address,
+      sessionId: authData.data.user.id,
       email: email
     };
     
@@ -1485,7 +1492,7 @@ Your subclub is now live and ready for members to join!`);
         <div className="text-slate-500">
           {selectedContract ? (
             <>
-              {selectedContract.lockupPeriod} {selectedContract.isChargedContract ? 'Month' : 'Year'} Contract • {(selectedContract.rigorLevel || 'medium').charAt(0).toUpperCase() + (selectedContract.rigorLevel || 'medium').slice(1)} Rigor
+              {selectedContract.lockupPeriod} {selectedContract.isChargedContract ? 'Month' : 'Year'} Contract • {((selectedContract.rigorLevel || 'medium').charAt(0).toUpperCase() + (selectedContract.rigorLevel || 'medium').slice(1))} Rigor
               <br />
               <span className="text-sm">
                 {selectedContract.contractAddress.slice(0, 8)}...{selectedContract.contractAddress.slice(-6)}
@@ -1535,7 +1542,7 @@ Your subclub is now live and ready for members to join!`);
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <div className="font-semibold text-slate-800">
-                        {subclub.lockupPeriod} {subclub.isChargedContract ? 'Month' : 'Year'} Contract - {(subclub.rigorLevel || 'medium').charAt(0).toUpperCase() + (subclub.rigorLevel || 'medium').slice(1)} Rigor
+                        {subclub.lockupPeriod} {subclub.isChargedContract ? 'Month' : 'Year'} Contract - {((subclub.rigorLevel || 'medium').charAt(0).toUpperCase() + (subclub.rigorLevel || 'medium').slice(1))} Rigor
                       </div>
                       <div className="text-sm text-slate-600">
                         {subclub.contractAddress.slice(0, 8)}...{subclub.contractAddress.slice(-6)}
@@ -1988,7 +1995,7 @@ Your subclub is now live and ready for members to join!`);
               ).map((subclub) => (
                 <div key={subclub.id} className={`p-4 bg-white/10 rounded-lg border-l-4 ${getContractColor(subclub)}`}>
                   <h3 className="font-semibold text-slate-800 mb-3">
-                    {subclub.lockupPeriod} Year Lockup - {(subclub.rigorLevel || 'medium').charAt(0).toUpperCase() + (subclub.rigorLevel || 'medium').slice(1)} Rigor
+                    {subclub.lockupPeriod} Year Lockup - {((subclub.rigorLevel || 'medium').charAt(0).toUpperCase() + (subclub.rigorLevel || 'medium').slice(1))} Rigor
                   </h3>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="p-3 bg-white/10 rounded-lg">

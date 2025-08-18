@@ -46,71 +46,67 @@ async function call(path, init) {
 }
 
 const TVC = {
-  create: async (name, rigor, lock_months) => {
-    console.log('🔄 Creating subclub with mock TVC SDK:', { name, rigor, lock_months });
+  create: (name, rigor, lock_months) =>
+    call("vault-create", { 
+      method: "POST", 
+      body: JSON.stringify({ name, rigor, lock_months }) 
+    }),
     
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  join: (subclub_id) =>
+    call("vault-join", { 
+      method: "POST", 
+      body: JSON.stringify({ subclub_id }) 
+    }),
     
-    // Generate mock subclub data
-    const mockSubclub = {
-      id: `subclub_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-      name: name,
-      rigor: rigor,
-      lock_months: lock_months,
-      created_at: new Date().toISOString(),
-      members: 1,
-      balance: "0.00",
-      status: "active"
-    };
+  balance: (subclub_id) =>
+    call(`vault-balance?subclub_id=${encodeURIComponent(subclub_id)}`),
     
-    console.log('✅ Mock subclub created successfully:', mockSubclub);
-    return { success: true, data: mockSubclub };
-  },
+  deposit: (subclub_id, amount_usdc) =>
+    call("vault-deposit", { 
+      method: "POST", 
+      headers: { "x-idempotency-key": rid() }, 
+      body: JSON.stringify({ subclub_id, amount_usdc }) 
+    }),
     
-  join: async (subclub_id) => {
-    console.log('🔄 Joining subclub (mock):', subclub_id);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    console.log('✅ Successfully joined subclub (mock)');
-    return { success: true };
-  },
-    
-  balance: async (subclub_id) => {
-    console.log('🔄 Getting balance (mock):', subclub_id);
-    return { success: true, balance: "0.00" };
-  },
-    
-  deposit: async (subclub_id, amount_usdc) => {
-    console.log('🔄 Making deposit (mock):', { subclub_id, amount_usdc });
-    await new Promise(resolve => setTimeout(resolve, 800));
-    console.log('✅ Deposit successful (mock)');
-    return { success: true };
-  },
-    
-  harvest: async (subclub_id) => {
-    console.log('🔄 Harvesting yield (mock):', subclub_id);
-    await new Promise(resolve => setTimeout(resolve, 1200));
-    console.log('✅ Harvest successful (mock)');
-    return { success: true };
-  },
+  harvest: (subclub_id) =>
+    call("vault-harvest", { 
+      method: "POST", 
+      headers: { "x-idempotency-key": rid() }, 
+      body: JSON.stringify({ subclub_id }) 
+    }),
 };
 
 // Authentication functions
 const signInWithSequence = async (email) => {
   try {
-    console.log(`Creating Sequence wallet for: ${email.slice(0, 3)}***`);
+    console.log(`Creating Sequence wallet for: ${email}`);
     
-    const mockWallet = `0x${Math.random().toString(16).substr(2, 40)}`;
-    const mockSessionId = Math.random().toString(36).slice(2);
+    // Call Supabase auth to create user and get JWT token
+    const authResponse = await fetch(`${cfg().functionsBase}/vault-club-user-creation`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-vault-club-api-key': cfg().vaultClubApiKey
+      },
+      body: JSON.stringify({ email })
+    });
     
-    localStorage.setItem("sb-access-token", `mock-jwt-${mockSessionId}`);
+    const authData = await authResponse.json();
     
-    console.log('✅ Sequence wallet created:', mockWallet.slice(0, 6) + '...');
+    if (!authData.success) {
+      throw new Error(authData.error || 'Failed to create user');
+    }
+    
+    // Store the JWT token for API calls
+    localStorage.setItem("sb-access-token", authData.data.access_token);
+    localStorage.setItem("user-email", email);
+    
+    console.log('✅ Sequence wallet created:', authData.data.wallet_address.slice(0, 6) + '...');
     
     return {
       success: true,
-      wallet: mockWallet,
-      sessionId: mockSessionId,
+      wallet: authData.data.wallet_address,
+      sessionId: authData.data.session_id,
       email: email
     };
     
@@ -125,11 +121,9 @@ const signInWithSequence = async (email) => {
 
 const connectWallet = async () => {
   try {
-    let email = prompt("Enter your email for Sequence wallet authentication:");
+    const email = prompt("Enter your email for Sequence wallet authentication:");
     if (!email) {
-      // Use default test email for testing purposes
-      email = "test@example.com";
-      console.log("Using default test email for wallet connection");
+      return null;
     }
     
     const result = await signInWithSequence(email);
@@ -381,7 +375,7 @@ const VaultClubWebsite = () => {
           )
         );
         
-        alert(`✅ Successfully joined subclub contract!\n\n${contractToJoin.lockupPeriod} ${contractToJoin.isChargedContract ? 'Month' : 'Year'} Lockup • ${contractToJoin.rigorLevel.charAt(0).toUpperCase() + contractToJoin.rigorLevel.slice(1)} Rigor\n\nYou can now start making deposits according to the contract schedule.`);
+        alert(`✅ Successfully joined subclub contract!\n\n${contractToJoin.lockupPeriod} ${contractToJoin.isChargedContract ? 'Month' : 'Year'} Lockup • ${(contractToJoin.rigorLevel || 'medium').charAt(0).toUpperCase() + (contractToJoin.rigorLevel || 'medium').slice(1)} Rigor\n\nYou can now start making deposits according to the contract schedule.`);
         
         // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -1031,7 +1025,7 @@ Contract Address: ${contractAddress}
 Contract Type: ${clubCreationData.isChargedContract ? 'Charged Contract' : 'Traditional Contract'}
 Max Members: ${clubCreationData.maxMembers}
 Lockup Period: ${clubCreationData.lockupPeriod} ${clubCreationData.isChargedContract ? 'month' : 'year'}${clubCreationData.lockupPeriod === 1 ? '' : 's'}
-Investment Rigor: ${clubCreationData.rigorLevel.charAt(0).toUpperCase() + clubCreationData.rigorLevel.slice(1)}
+Investment Rigor: ${(clubCreationData.rigorLevel || 'medium').charAt(0).toUpperCase() + (clubCreationData.rigorLevel || 'medium').slice(1)}
 Privacy: ${clubCreationData.isPrivate ? 'Private (invitation only)' : 'Public (visible to all)'}
 Utility Fee: ${clubCreationData.isChargedContract ? '$1.25' : '$1.00'}/user/week
 
@@ -1491,7 +1485,7 @@ Your subclub is now live and ready for members to join!`);
         <div className="text-slate-500">
           {selectedContract ? (
             <>
-              {selectedContract.lockupPeriod} {selectedContract.isChargedContract ? 'Month' : 'Year'} Contract • {selectedContract.rigorLevel.charAt(0).toUpperCase() + selectedContract.rigorLevel.slice(1)} Rigor
+              {selectedContract.lockupPeriod} {selectedContract.isChargedContract ? 'Month' : 'Year'} Contract • {(selectedContract.rigorLevel || 'medium').charAt(0).toUpperCase() + (selectedContract.rigorLevel || 'medium').slice(1)} Rigor
               <br />
               <span className="text-sm">
                 {selectedContract.contractAddress.slice(0, 8)}...{selectedContract.contractAddress.slice(-6)}
@@ -1541,7 +1535,7 @@ Your subclub is now live and ready for members to join!`);
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <div className="font-semibold text-slate-800">
-                        {subclub.lockupPeriod} {subclub.isChargedContract ? 'Month' : 'Year'} Contract - {subclub.rigorLevel.charAt(0).toUpperCase() + subclub.rigorLevel.slice(1)} Rigor
+                        {subclub.lockupPeriod} {subclub.isChargedContract ? 'Month' : 'Year'} Contract - {(subclub.rigorLevel || 'medium').charAt(0).toUpperCase() + (subclub.rigorLevel || 'medium').slice(1)} Rigor
                       </div>
                       <div className="text-sm text-slate-600">
                         {subclub.contractAddress.slice(0, 8)}...{subclub.contractAddress.slice(-6)}
@@ -1994,7 +1988,7 @@ Your subclub is now live and ready for members to join!`);
               ).map((subclub) => (
                 <div key={subclub.id} className={`p-4 bg-white/10 rounded-lg border-l-4 ${getContractColor(subclub)}`}>
                   <h3 className="font-semibold text-slate-800 mb-3">
-                    {subclub.lockupPeriod} Year Lockup - {subclub.rigorLevel.charAt(0).toUpperCase() + subclub.rigorLevel.slice(1)} Rigor
+                    {subclub.lockupPeriod} Year Lockup - {(subclub.rigorLevel || 'medium').charAt(0).toUpperCase() + (subclub.rigorLevel || 'medium').slice(1)} Rigor
                   </h3>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="p-3 bg-white/10 rounded-lg">
@@ -2109,7 +2103,7 @@ Your subclub is now live and ready for members to join!`);
                         setTimeout(() => setShowCopiedBanner(false), 2000);
                       }).catch(() => {
                         // Fallback for older browsers
-                        const shareText = `Join my VaultClub investment contract!\n\n${subclub.lockupPeriod} ${subclub.isChargedContract ? 'Month' : 'Year'} Lockup • ${subclub.rigorLevel.charAt(0).toUpperCase() + subclub.rigorLevel.slice(1)} Rigor\n\nJoin here: ${shareUrl}`;
+                        const shareText = `Join my VaultClub investment contract!\n\n${subclub.lockupPeriod} ${subclub.isChargedContract ? 'Month' : 'Year'} Lockup • ${(subclub.rigorLevel || 'medium').charAt(0).toUpperCase() + (subclub.rigorLevel || 'medium').slice(1)} Rigor\n\nJoin here: ${shareUrl}`;
                         
                         // Try to use the Web Share API if available
                         if (navigator.share) {

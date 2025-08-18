@@ -9,22 +9,45 @@ export const signInWithSequence = async (email) => {
     const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     const walletAddress = `0x${hashHex.slice(0, 40)}`;
     
-    const sessionId = `user_${Math.random().toString(36).slice(2)}`;
+    const response = await fetch(`${window.__TVC_CONFIG.functionsBase}/auth/signup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsZGpobG5zcGhsaXhtenp6cmR3aSIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzU1NDQ5NjAwLCJleHAiOjIwNzEwMjU2MDB9.Kx8nNKlyqQjGgGdEHaAm0xMtF7cL9J8vQwRtYzXpN4s'
+      },
+      body: JSON.stringify({
+        email: email,
+        password: 'TempPassword123!',
+        options: {
+          data: {
+            wallet_address: walletAddress,
+            network: 'amoy'
+          }
+        }
+      })
+    });
     
-    const jwtToken = `jwt-${sessionId}`;
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Supabase auth failed: ${errorData.message || response.statusText}`);
+    }
     
-    localStorage.setItem("sb-access-token", jwtToken);
+    const authData = await response.json();
+    const accessToken = authData.access_token;
+    const userId = authData.user?.id;
+    
+    localStorage.setItem("sb-access-token", accessToken);
     localStorage.setItem("user-email", email);
-    localStorage.setItem("user-id", sessionId);
+    localStorage.setItem("user-id", userId);
     localStorage.setItem("wallet-address", walletAddress);
     
     try {
-      const response = await fetch(`${window.__TVC_CONFIG.functionsBase}/vault-club-user-creation`, {
+      const userCreationResponse = await fetch(`${window.__TVC_CONFIG.functionsBase}/vault-club-user-creation`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-vault-club-api-key': window.__TVC_CONFIG.vaultClubApiKey,
-          'authorization': `Bearer ${jwtToken}`
+          'authorization': `Bearer ${accessToken}`
         },
         body: JSON.stringify({
           email: email,
@@ -33,7 +56,7 @@ export const signInWithSequence = async (email) => {
         })
       });
       
-      if (response.ok) {
+      if (userCreationResponse.ok) {
         console.log('✅ User created in Supabase for AMOY token transfers');
       } else {
         console.warn('User creation in Supabase failed, but wallet created locally');
@@ -48,7 +71,7 @@ export const signInWithSequence = async (email) => {
     return {
       success: true,
       wallet: walletAddress,
-      sessionId: sessionId,
+      sessionId: userId,
       email: email
     };
     

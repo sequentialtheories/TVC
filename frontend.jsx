@@ -189,6 +189,7 @@ const VaultClubWebsite = () => {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+  const [authMode, setAuthMode] = useState('select');
   const [authError, setAuthError] = useState('');
   const [currentPage, setCurrentPage] = useState('home');
   const [walletConnected, setWalletConnected] = useState(false);
@@ -623,6 +624,7 @@ const VaultClubWebsite = () => {
   };
 
   const handleConnectWallet = async () => {
+    setAuthMode('select');
     setShowAuthModal(true);
   };
 
@@ -634,27 +636,31 @@ const VaultClubWebsite = () => {
     setAuthError('');
     
     try {
-      console.log('🔄 Attempting authentication with Sequence Theory...');
-      
       const { authenticateWithSequenceTheory, createSequenceTheoryAccount } = await import('./src/lib/sequenceAuth.js');
       
-      const authResult = await authenticateWithSequenceTheory(authEmail, authPassword);
-      
-      if (authResult.success) {
-        localStorage.setItem("sb-access-token", authResult.session.access_token);
-        setWalletAddress(authResult.wallet.address);
-        setWalletConnected(true);
-        setShowAuthModal(false);
-        setAuthEmail('');
-        setAuthPassword('');
+      if (authMode === 'existing') {
+        console.log('🔄 Attempting to sign in existing user...');
+        const authResult = await authenticateWithSequenceTheory(authEmail, authPassword);
         
-        const balance = await getVaultBalance(authResult.wallet.address);
-        setVaultBalance(balance);
-        setVaultStats({ totalMembers: 0, totalDeposits: 0, vaultHealth: 100 });
-        
-        console.log('✅ Wallet connected:', authResult.wallet.address);
-      } else {
-        console.log('🔄 Authentication failed, trying to create new account...');
+        if (authResult.success) {
+          localStorage.setItem("sb-access-token", authResult.session.access_token);
+          setWalletAddress(authResult.wallet.address);
+          setWalletConnected(true);
+          setShowAuthModal(false);
+          setAuthEmail('');
+          setAuthPassword('');
+          setAuthMode('select');
+          
+          const balance = await getVaultBalance(authResult.wallet.address);
+          setVaultBalance(balance);
+          setVaultStats({ totalMembers: 0, totalDeposits: 0, vaultHealth: 100 });
+          
+          console.log('✅ Existing user signed in:', authResult.wallet.address);
+        } else {
+          throw new Error(authResult.error || 'Login failed. Please check your credentials.');
+        }
+      } else if (authMode === 'new') {
+        console.log('🔄 Creating new user account...');
         const createResult = await createSequenceTheoryAccount(authEmail, authPassword);
         
         if (createResult.success) {
@@ -664,14 +670,15 @@ const VaultClubWebsite = () => {
           setShowAuthModal(false);
           setAuthEmail('');
           setAuthPassword('');
+          setAuthMode('select');
           
           const balance = await getVaultBalance(createResult.wallet.address);
           setVaultBalance(balance);
           setVaultStats({ totalMembers: 0, totalDeposits: 0, vaultHealth: 100 });
           
-          console.log('✅ New account created and wallet connected:', createResult.wallet.address);
+          console.log('✅ New account created and signed in:', createResult.wallet.address);
         } else {
-          throw new Error(createResult.error || 'Authentication failed');
+          throw new Error(createResult.error || 'Account creation failed');
         }
       }
     } catch (error) {
@@ -910,88 +917,145 @@ const VaultClubWebsite = () => {
     }
   };
 
-  const AuthModal = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-slate-800">Connect Account</h2>
-          <button 
-            onClick={() => {
-              setShowAuthModal(false);
-              setAuthEmail('');
-              setAuthPassword('');
-              setAuthError('');
-            }}
-            className="text-slate-400 hover:text-slate-600"
-          >
-            ✕
-          </button>
-        </div>
-        
-        <form onSubmit={handleAuthSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              value={authEmail}
-              onChange={(e) => setAuthEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Enter your email"
-              required
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              value={authPassword}
-              onChange={(e) => setAuthPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Enter your password"
-              required
-            />
-          </div>
-          
-          {authError && (
-            <div className="text-red-600 text-sm bg-red-50 p-2 rounded">
-              {authError}
+  const AuthModal = () => {
+    if (authMode === 'select') {
+      return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-slate-800">Account Access</h2>
+              <button 
+                onClick={() => {
+                  setShowAuthModal(false);
+                  setAuthMode('select');
+                  setAuthEmail('');
+                  setAuthPassword('');
+                  setAuthError('');
+                }}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
             </div>
-          )}
-          
-          <div className="flex gap-3">
-            <button
-              type="button"
+            
+            <div className="space-y-4">
+              <button
+                onClick={() => setAuthMode('existing')}
+                className="w-full px-4 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium transition-colors"
+              >
+                Connect Account
+              </button>
+              <p className="text-xs text-slate-500 text-center -mt-2">
+                Sign in with your existing Sequence Theory account
+              </p>
+              
+              <button
+                onClick={() => setAuthMode('new')}
+                className="w-full px-4 py-3 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 font-medium transition-colors"
+              >
+                New Account
+              </button>
+              <p className="text-xs text-slate-500 text-center -mt-2">
+                Create a new Sequence Theory account
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setAuthMode('select')}
+                className="text-slate-400 hover:text-slate-600 text-lg"
+              >
+                ←
+              </button>
+              <h2 className="text-xl font-bold text-slate-800">
+                {authMode === 'existing' ? 'Connect Account' : 'Create New Account'}
+              </h2>
+            </div>
+            <button 
               onClick={() => {
                 setShowAuthModal(false);
+                setAuthMode('select');
                 setAuthEmail('');
                 setAuthPassword('');
                 setAuthError('');
               }}
-              className="flex-1 px-4 py-2 text-slate-600 border border-slate-300 rounded-md hover:bg-slate-50"
+              className="text-slate-400 hover:text-slate-600"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={authLoading || !authEmail || !authPassword}
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {authLoading ? 'Connecting...' : 'Connect'}
+              ✕
             </button>
           </div>
-        </form>
-        
-        <div className="mt-4 text-xs text-slate-500 text-center">
-          New users will have accounts created automatically
+          
+          <form onSubmit={handleAuthSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Email
+              </label>
+              <input
+                type="email"
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Password
+              </label>
+              <input
+                type="password"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder={authMode === 'existing' ? 'Enter your password' : 'Create a password'}
+                required
+              />
+            </div>
+            
+            {authError && (
+              <div className="text-red-600 text-sm bg-red-50 p-2 rounded">
+                {authError}
+              </div>
+            )}
+            
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setAuthMode('select')}
+                className="flex-1 px-4 py-2 text-slate-600 border border-slate-300 rounded-md hover:bg-slate-50"
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                disabled={authLoading || !authEmail || !authPassword}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {authLoading ? 'Processing...' : (authMode === 'existing' ? 'Connect' : 'Create Account')}
+              </button>
+            </div>
+          </form>
+          
+          <div className="mt-4 text-xs text-slate-500 text-center">
+            {authMode === 'existing' 
+              ? 'Sign in with your existing Sequence Theory credentials'
+              : 'Your new account will be created with Sequence Theory integration'
+            }
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const CreateClubModal = () => {    
     return (

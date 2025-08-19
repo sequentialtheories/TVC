@@ -4,12 +4,15 @@ import { Database, Settings, User, Users, TrendingUp, Info, X, Bitcoin, DollarSi
 
 async function connectWallet() {
   try {
+    const email = prompt("Enter your email:");
+    if (!email) return null;
+    
+    const password = prompt("Enter your password (or create one for new account):");
+    if (!password) return null;
+    
+    console.log('🔄 Attempting authentication with Sequence Theory...');
+    
     const { authenticateWithSequenceTheory, createSequenceTheoryAccount } = await import('./src/lib/sequenceAuth.js');
-    
-    const email = "test@example.com";
-    const password = "testpassword123";
-    
-    console.log('🔄 Attempting authentication with test credentials...');
     
     // Try to authenticate with existing account first
     const authResult = await authenticateWithSequenceTheory(email, password);
@@ -38,7 +41,11 @@ async function connectWallet() {
     }
   } catch (error) {
     console.error('Wallet connection error:', error);
-    console.error('Full error details:', error);
+    if (error.message.includes('Invalid Vault Club API key')) {
+      alert('Authentication service temporarily unavailable. Please try again later.');
+    } else {
+      alert('Authentication failed: ' + error.message);
+    }
     return null;
   }
 }

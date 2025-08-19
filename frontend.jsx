@@ -4,13 +4,7 @@ import { Database, Settings, User, Users, TrendingUp, Info, X, Bitcoin, DollarSi
 
 async function connectWallet() {
   try {
-    const email = prompt("Enter your email:");
-    if (!email) return null;
-    
-    const password = prompt("Enter your password (or create one for new account):");
-    if (!password) return null;
-    
-    console.log('🔄 Attempting authentication with Sequence Theory...');
+    return null;
     
     const { authenticateWithSequenceTheory, createSequenceTheoryAccount } = await import('./src/lib/sequenceAuth.js');
     
@@ -191,6 +185,11 @@ async function harvestAndRoute() {
 const VaultClubWebsite = () => {
   const [activeModal, setActiveModal] = useState(null);
   const [activeStrand, setActiveStrand] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
   const [currentPage, setCurrentPage] = useState('home');
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
@@ -624,19 +623,62 @@ const VaultClubWebsite = () => {
   };
 
   const handleConnectWallet = async () => {
-    const address = await connectWallet();
-    if (address) {
-      setWalletConnected(true);
-      setWalletAddress(address);
+    setShowAuthModal(true);
+  };
+
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    if (!authEmail || !authPassword) return;
+    
+    setAuthLoading(true);
+    setAuthError('');
+    
+    try {
+      console.log('🔄 Attempting authentication with Sequence Theory...');
       
-      const balance = await getVaultBalance(address);
-      setVaultBalance(balance);
+      const { authenticateWithSequenceTheory, createSequenceTheoryAccount } = await import('./src/lib/sequenceAuth.js');
       
-      setVaultStats({ totalMembers: 0, totalDeposits: 0, vaultHealth: 100 });
+      const authResult = await authenticateWithSequenceTheory(authEmail, authPassword);
       
-      console.log('✅ Wallet connected successfully:', address.slice(0, 6) + '...' + address.slice(-4));
-    } else {
-      console.error('❌ Wallet connection failed');
+      if (authResult.success) {
+        localStorage.setItem("sb-access-token", authResult.session.access_token);
+        setWalletAddress(authResult.wallet.address);
+        setWalletConnected(true);
+        setShowAuthModal(false);
+        setAuthEmail('');
+        setAuthPassword('');
+        
+        const balance = await getVaultBalance(authResult.wallet.address);
+        setVaultBalance(balance);
+        setVaultStats({ totalMembers: 0, totalDeposits: 0, vaultHealth: 100 });
+        
+        console.log('✅ Wallet connected:', authResult.wallet.address);
+      } else {
+        console.log('🔄 Authentication failed, trying to create new account...');
+        const createResult = await createSequenceTheoryAccount(authEmail, authPassword);
+        
+        if (createResult.success) {
+          localStorage.setItem("sb-access-token", createResult.session.access_token);
+          setWalletAddress(createResult.wallet.address);
+          setWalletConnected(true);
+          setShowAuthModal(false);
+          setAuthEmail('');
+          setAuthPassword('');
+          
+          const balance = await getVaultBalance(createResult.wallet.address);
+          setVaultBalance(balance);
+          setVaultStats({ totalMembers: 0, totalDeposits: 0, vaultHealth: 100 });
+          
+          console.log('✅ New account created and wallet connected:', createResult.wallet.address);
+        } else {
+          throw new Error(createResult.error || 'Authentication failed');
+        }
+      }
+    } catch (error) {
+      console.error('Authentication error:', error);
+      setAuthError(error.message || 'Authentication failed');
+    } finally {
+      setAuthLoading(false);
     }
   };
 
@@ -867,6 +909,89 @@ const VaultClubWebsite = () => {
       console.error("Failed to create subclub:", error);
     }
   };
+
+  const AuthModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-slate-800">Connect Account</h2>
+          <button 
+            onClick={() => {
+              setShowAuthModal(false);
+              setAuthEmail('');
+              setAuthPassword('');
+              setAuthError('');
+            }}
+            className="text-slate-400 hover:text-slate-600"
+          >
+            ✕
+          </button>
+        </div>
+        
+        <form onSubmit={handleAuthSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Email
+            </label>
+            <input
+              type="email"
+              value={authEmail}
+              onChange={(e) => setAuthEmail(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="Enter your email"
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Password
+            </label>
+            <input
+              type="password"
+              value={authPassword}
+              onChange={(e) => setAuthPassword(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="Enter your password"
+              required
+            />
+          </div>
+          
+          {authError && (
+            <div className="text-red-600 text-sm bg-red-50 p-2 rounded">
+              {authError}
+            </div>
+          )}
+          
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setShowAuthModal(false);
+                setAuthEmail('');
+                setAuthPassword('');
+                setAuthError('');
+              }}
+              className="flex-1 px-4 py-2 text-slate-600 border border-slate-300 rounded-md hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={authLoading || !authEmail || !authPassword}
+              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {authLoading ? 'Connecting...' : 'Connect'}
+            </button>
+          </div>
+        </form>
+        
+        <div className="mt-4 text-xs text-slate-500 text-center">
+          New users will have accounts created automatically
+        </div>
+      </div>
+    </div>
+  );
 
   const CreateClubModal = () => {    
     return (
@@ -3024,6 +3149,9 @@ const VaultClubWebsite = () => {
 
       {/* Create Club Modal */}
       {activeModal === 'createClub' && <CreateClubModal />}
+      
+      {/* Auth Modal */}
+      {showAuthModal && <AuthModal />}
     </div>
   );
 };

@@ -5,10 +5,18 @@
   "main": "frontend",
   "type": "module",
   "dependencies": {
-    "@0xsequence/waas": "^1.0.0"
+    "@0xsequence/waas": "^1.10.15",
+    "lucide-react": "^0.540.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
   },
   "scripts": {
-    "dev": "python3 -m http.server 8000",
-    "build": "echo 'No build step required for single-file frontend'"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.1",
+    "vite": "^7.1.3"
   }
 }

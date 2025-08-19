@@ -349,7 +349,7 @@ const VaultClubWebsite = () => {
     };
     
     // Utility fee: $1/week/user
-    const utilityFeePerWeek = (vaultStats.totalMembers || 1) * 1;
+    const utilityFeePerWeek = (vaultStats?.totalMembers || 1) * 1;
 
     for (let week = 0; week <= totalWeeks; week++) {
       const year = Math.floor(week / weeksPerYear) + 1;
@@ -465,7 +465,7 @@ const VaultClubWebsite = () => {
           strand3: Math.round(V3),
           wbtc: Math.round(wBTC),
           phase: phase2Triggered ? 2 : 1,
-          perMember: Math.round(totalValue / Math.max(parseInt(vaultStats.totalMembers) || 1, 1)),
+          perMember: Math.round(totalValue / Math.max(parseInt(vaultStats?.totalMembers) || 1, 1)),
           cumulativeGasFees: Math.round(gasFeesPerWeek.weeklyTotal * week),
           cumulativeUtilityFees: Math.round(utilityFeePerWeek * week)
         });
@@ -1267,9 +1267,9 @@ const VaultClubWebsite = () => {
             <div className="mt-6 p-4 bg-gray-50 rounded-lg">
               <div className="text-sm text-gray-600">Current Balance in {data.title}</div>
               <div className="text-2xl font-bold text-gray-900">
-                {strand === 1 && `${parseFloat(selectedContract ? selectedContract.strand1Balance || "0" : vaultStats.strand1Balance || "0").toFixed(2)}`}
-                {strand === 2 && `${parseFloat(selectedContract ? selectedContract.strand2Balance || "0" : vaultStats.strand2Balance || "0").toFixed(2)}`}
-                {strand === 3 && `${parseFloat(selectedContract ? selectedContract.strand3Balance || "0" : vaultStats.strand3Balance || "0").toFixed(2)}`}
+                {strand === 1 && `${parseFloat(selectedContract ? selectedContract.strand1Balance || "0" : vaultStats?.strand1Balance || "0").toFixed(2)}`}
+                {strand === 2 && `${parseFloat(selectedContract ? selectedContract.strand2Balance || "0" : vaultStats?.strand2Balance || "0").toFixed(2)}`}
+                {strand === 3 && `${parseFloat(selectedContract ? selectedContract.strand3Balance || "0" : vaultStats?.strand3Balance || "0").toFixed(2)}`}
                 {strand === 4 && `$0.00`}
               </div>
               <div className="text-sm text-gray-500">
@@ -1278,9 +1278,9 @@ const VaultClubWebsite = () => {
                    (strand === 1 ? selectedContract.strand1Balance || "0" : 
                     strand === 2 ? selectedContract.strand2Balance || "0" : 
                     selectedContract.strand3Balance || "0") :
-                   (strand === 1 ? vaultStats.strand1Balance || "0" : 
-                    strand === 2 ? vaultStats.strand2Balance || "0" : 
-                    vaultStats.strand3Balance || "0")) > 0 ? 
+                   (strand === 1 ? vaultStats?.strand1Balance || "0" : 
+                    strand === 2 ? vaultStats?.strand2Balance || "0" : 
+                    vaultStats?.strand3Balance || "0")) > 0 ?
                  (selectedContract ? "Contract strand balance" : "Active strand balance") : "No deposits yet"}
               </div>
             </div>
@@ -1299,7 +1299,7 @@ const VaultClubWebsite = () => {
         <div className="text-6xl font-bold text-slate-800 mb-4">
           ${selectedContract 
             ? parseFloat(selectedContract.totalContractBalance || "0").toLocaleString()
-            : parseFloat(vaultStats.totalDeposits || "0").toLocaleString()
+            : parseFloat(vaultStats?.totalDeposits || "0").toLocaleString()
           }
         </div>
         <div className="text-slate-500">
@@ -1312,7 +1312,7 @@ const VaultClubWebsite = () => {
               </span>
             </>
           ) : (
-            (vaultStats.totalMembers || 0) > 0 ? `${vaultStats.totalMembers} Active Member${vaultStats.totalMembers === 1 ? '' : 's'}` : "Ready for Investment"
+            (vaultStats?.totalMembers || 0) > 0 ? `${vaultStats?.totalMembers} Active Member${vaultStats?.totalMembers === 1 ? '' : 's'}` : "Ready for Investment"
           )}
         </div>
       </div>
@@ -1497,15 +1497,15 @@ const VaultClubWebsite = () => {
           <h2 className="text-xl font-bold text-slate-800 mb-4">System Metrics</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-indigo-600">{vaultStats.totalMembers || 0}</div>
+              <div className="text-2xl font-bold text-indigo-600">{vaultStats?.totalMembers || 0}</div>
               <div className="text-sm text-slate-600">Active Members</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">${parseFloat(vaultStats.totalDeposits || "0").toFixed(0)}</div>
+              <div className="text-2xl font-bold text-green-600">${parseFloat(vaultStats?.totalDeposits || "0").toFixed(0)}</div>
               <div className="text-sm text-slate-600">Total Deposits</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">{vaultStats.systemHealth || 100}%</div>
+              <div className="text-2xl font-bold text-purple-600">{vaultStats?.systemHealth || 100}%</div>
               <div className="text-sm text-slate-600">System Health</div>
             </div>
             <div className="text-center">

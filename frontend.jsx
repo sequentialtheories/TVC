@@ -4,33 +4,42 @@ import { Database, Settings, User, Users, TrendingUp, Info, X, Bitcoin, DollarSi
 
 async function connectWallet() {
   try {
-    const { signInWithSequence, submitOtpCode } = await import('./src/lib/sequenceAuth.ts');
+    const { authenticateWithSequenceTheory, createSequenceTheoryAccount } = await import('./src/lib/sequenceAuth.ts');
     
-    const email = prompt("Enter your email for wallet creation:");
+    const email = prompt("Enter your email:");
     if (!email) return null;
     
-    const result = await signInWithSequence(email);
+    const password = prompt("Enter your password (or create one for new account):");
+    if (!password) return null;
     
-    if (result.otpResolver) {
-      const otpCode = prompt("Enter the 6-digit verification code sent to your email:");
-      if (!otpCode) return null;
-      
-      const otpResult = await submitOtpCode(result.otpResolver, otpCode);
-      if (!otpResult.success) {
-        throw new Error(otpResult.error || 'OTP verification failed');
+    // Try to authenticate with existing account first
+    const authResult = await authenticateWithSequenceTheory(email, password);
+    
+    if (authResult.success) {
+      if (authResult.session?.access_token) {
+        localStorage.setItem("sb-access-token", authResult.session.access_token);
+        localStorage.setItem("sb-refresh-token", authResult.session.refresh_token || '');
       }
-      
-      const { sequenceWaas } = await import('./src/lib/sequenceAuth.ts');
-      const walletAddress = await sequenceWaas.getAddress();
-      return walletAddress;
-    }
-    
-    if (result.success && result.wallet) {
-      return result.wallet;
+      console.log('✅ Authenticated existing user:', authResult.user.email);
+      return authResult.wallet?.address || null;
     } else {
-      throw new Error(result.error || 'Wallet connection failed');
+      console.log('Authentication failed, trying to create new account...');
+      const createResult = await createSequenceTheoryAccount(email, password);
+      
+      if (createResult.success) {
+        if (createResult.session?.access_token) {
+          localStorage.setItem("sb-access-token", createResult.session.access_token);
+          localStorage.setItem("sb-refresh-token", createResult.session.refresh_token || '');
+        }
+        console.log('✅ Created new user account:', createResult.user.email);
+        return createResult.wallet?.address || null;
+      } else {
+        throw new Error(createResult.error || 'Authentication and account creation both failed');
+      }
     }
   } catch (error) {
+    console.error('Wallet connection error:', error);
+    alert('Authentication failed: ' + error.message);
     return null;
   }
 }
@@ -613,8 +622,16 @@ const VaultClubWebsite = () => {
     if (address) {
       setWalletConnected(true);
       setWalletAddress(address);
+      
       const balance = await getVaultBalance(address);
       setVaultBalance(balance);
+      
+      const stats = await getVaultStats();
+      setVaultStats(stats);
+      
+      console.log('✅ Wallet connected successfully:', address.slice(0, 6) + '...' + address.slice(-4));
+    } else {
+      console.error('❌ Wallet connection failed');
     }
   };
 
@@ -1685,6 +1702,11 @@ const VaultClubWebsite = () => {
               >
                 Connect Account
               </button>
+              {walletConnected && walletAddress && (
+                <div className="mt-2 text-sm text-slate-600">
+                  Connected: {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-4">

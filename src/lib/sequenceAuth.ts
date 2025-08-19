@@ -1,57 +1,73 @@
 
-import { SequenceWaaS } from '@0xsequence/waas'
-
-export const sequenceWaas = new SequenceWaaS({
-  projectAccessKey: 'AQAAAAAAAKg7Q8xQ94GXN9ogCwnDTzn-BkE',
-  waasConfigKey: 'eyJwcm9qZWN0SWQiOjQzMDY3LCJycGNTZXJ2ZXIiOiJodHRwczovL3dhYXMuc2VxdWVuY2UuYXBwIn0=',
-  network: 'amoy'
-})
-
-export const signInWithSequence = async (email: string) => {
+export const authenticateWithSequenceTheory = async (email: string, password: string) => {
   try {
-    let otpResolver: ((code: string) => Promise<void>) | null = null
+    const response = await fetch(`${(window as any).__TVC_CONFIG.functionsBase}/vault-club-auth-sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-vault-club-api-key': (window as any).__TVC_CONFIG.vaultClubApiKey
+      },
+      body: JSON.stringify({ email, password })
+    });
     
-    sequenceWaas.onEmailAuthCodeRequired(async (respondWithCode) => {
-      otpResolver = respondWithCode
-    })
+    const result = await response.json();
     
-    const signInResult = await sequenceWaas.signIn({ email }, "TVC Non-Custodial Session")
-    
-    if (!signInResult.wallet) {
-      throw new Error('Failed to create non-custodial Sequence wallet')
-    }
-    
-    if (signInResult.sessionId) {
-      localStorage.setItem("sb-access-token", signInResult.sessionId);
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || 'Authentication failed');
     }
     
     return {
       success: true,
-      wallet: signInResult.wallet,
-      sessionId: signInResult.sessionId,
-      email: signInResult.email,
-      otpResolver
+      user: result.data.user,
+      wallet: result.data.wallet,
+      session: result.data.session
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+};
+
+export const createSequenceTheoryAccount = async (email: string, password: string, name?: string) => {
+  try {
+    const response = await fetch(`${(window as any).__TVC_CONFIG.functionsBase}/vault-club-user-creation`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-vault-club-api-key': (window as any).__TVC_CONFIG.vaultClubApiKey
+      },
+      body: JSON.stringify({ 
+        email, 
+        password, 
+        name: name || email.split('@')[0],
+        metadata: { created_via: 'tvc_frontend' }
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || 'Account creation failed');
     }
     
+    const authResult = await authenticateWithSequenceTheory(email, password);
+    
+    if (!authResult.success) {
+      throw new Error('Account created but login failed: ' + authResult.error);
+    }
+    
+    return {
+      success: true,
+      user: authResult.user,
+      wallet: authResult.wallet,
+      session: authResult.session
+    };
   } catch (error) {
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
   }
-}
-
-export const submitOtpCode = async (otpResolver: ((code: string) => Promise<void>) | null, code: string) => {
-  try {
-    if (!otpResolver) {
-      throw new Error('No OTP resolver available')
-    }
-    await otpResolver(code)
-    return { success: true }
-  } catch (error) {
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    }
-  }
-}
+};

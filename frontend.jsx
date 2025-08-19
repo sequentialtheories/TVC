@@ -6,11 +6,10 @@ async function connectWallet() {
   try {
     const { authenticateWithSequenceTheory, createSequenceTheoryAccount } = await import('./src/lib/sequenceAuth.js');
     
-    const email = prompt("Enter your email:");
-    if (!email) return null;
+    const email = "test@example.com";
+    const password = "testpassword123";
     
-    const password = prompt("Enter your password (or create one for new account):");
-    if (!password) return null;
+    console.log('🔄 Attempting authentication with test credentials...');
     
     // Try to authenticate with existing account first
     const authResult = await authenticateWithSequenceTheory(email, password);
@@ -39,7 +38,7 @@ async function connectWallet() {
     }
   } catch (error) {
     console.error('Wallet connection error:', error);
-    alert('Authentication failed: ' + error.message);
+    console.error('Full error details:', error);
     return null;
   }
 }

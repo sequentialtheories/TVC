@@ -798,7 +798,6 @@ const VaultClubWebsite = () => {
         clubCreationData.lockupPeriod
       );
       
-      console.log('Subclub created:', result);
       
       const colors = [
         'border-yellow-500',   
@@ -849,11 +848,8 @@ const VaultClubWebsite = () => {
         customSchedule: []
       });
       
-      console.log("New subclub created:", newSubclub);
-      alert(`Subclub created successfully!\nContract: ${result.data.subclub_id}`);
     } catch (error) {
       console.error("Failed to create subclub:", error);
-      alert(`Failed to create subclub: ${error.message}`);
     }
   };
 
@@ -1929,7 +1925,6 @@ const VaultClubWebsite = () => {
                           });
                         } else {
                           // Final fallback - show the URL in an alert
-                          alert(`Share this link:\n\n${shareUrl}\n\nOr copy this message:\n\n${shareText}`);
                         }
                       });
                     }}
@@ -2010,7 +2005,6 @@ const VaultClubWebsite = () => {
                               className="text-xs px-3 py-1 rounded-full transition-colors bg-green-500 hover:bg-green-600 text-white"
                               onClick={() => {
                                 // Join contract logic here
-                                alert(`Joining contract ${subclub.contractAddress.slice(0,8)}...`);
                               }}
                             >
                               Join

@@ -4,7 +4,7 @@ import { Database, Settings, User, Users, TrendingUp, Info, X, Bitcoin, DollarSi
 
 async function connectWallet() {
   try {
-    const { authenticateWithSequenceTheory, createSequenceTheoryAccount } = await import('./src/lib/sequenceAuth.ts');
+    const { authenticateWithSequenceTheory, createSequenceTheoryAccount } = await import('./src/lib/sequenceAuth.js');
     
     const email = prompt("Enter your email:");
     if (!email) return null;
@@ -47,7 +47,7 @@ async function connectWallet() {
 // Get vault balance for address - fallback version without ethers dependency
 async function getVaultBalance(address) {
   try {
-    const { TVC } = await import('./src/lib/tvcClient.ts');
+    const { TVC } = await import('./src/lib/tvcClient.js');
     return "0";
   } catch (error) {
     console.error("Error fetching vault balance:", error);
@@ -58,7 +58,7 @@ async function getVaultBalance(address) {
 // Get vault stats from contract - fallback version
 async function getVaultStats() {
   try {
-    const { TVC } = await import('./src/lib/tvcClient.ts');
+    const { TVC } = await import('./src/lib/tvcClient.js');
     const result = await TVC.stats();
     return result.data;
   } catch (error) {
@@ -129,7 +129,7 @@ async function getBitcoinPrice() {
 
 async function getMemberAllocation() {
   try {
-    const { TVC } = await import('./src/lib/tvcClient.ts');
+    const { TVC } = await import('./src/lib/tvcClient.js');
     return [];
   } catch (error) {
     return [];
@@ -139,7 +139,7 @@ async function getMemberAllocation() {
 // Deposit amount (in ether) to vault contract
 async function depositToVault(amountEther) {
   try {
-    const { TVC } = await import('./src/lib/tvcClient.ts');
+    const { TVC } = await import('./src/lib/tvcClient.js');
     
     const userSubclubs = deployedSubclubs.filter(club => 
       club.members && club.members.includes(walletAddress)
@@ -162,7 +162,7 @@ async function depositToVault(amountEther) {
 // Harvest and route yields
 async function harvestAndRoute() {
   try {
-    const { TVC } = await import('./src/lib/tvcClient.ts');
+    const { TVC } = await import('./src/lib/tvcClient.js');
     
     const userSubclubs = deployedSubclubs.filter(club => 
       club.members && club.members.includes(walletAddress)
@@ -488,7 +488,7 @@ const VaultClubWebsite = () => {
 
   useEffect(() => {
     calculateSimulation();
-  }, [apyStrand1, apyStrand2, apyStrand3, btcPrice, simulationYears, simulationRigor, customSimulationAmount, vaultStats.totalMembers]);
+  }, [apyStrand1, apyStrand2, apyStrand3, btcPrice, simulationYears, simulationRigor, customSimulationAmount, vaultStats?.totalMembers]);
 
   const closeModal = () => {
     setActiveModal(null);
@@ -626,8 +626,7 @@ const VaultClubWebsite = () => {
       const balance = await getVaultBalance(address);
       setVaultBalance(balance);
       
-      const stats = await getVaultStats();
-      setVaultStats(stats);
+      setVaultStats({ totalMembers: 0, totalDeposits: 0, vaultHealth: 100 });
       
       console.log('✅ Wallet connected successfully:', address.slice(0, 6) + '...' + address.slice(-4));
     } else {
@@ -794,7 +793,7 @@ const VaultClubWebsite = () => {
     }
     
     try {
-      const { TVC } = await import('./src/lib/tvcClient.ts');
+      const { TVC } = await import('./src/lib/tvcClient.js');
       
       const rigorMapping = {
         'light': 'LIGHT',

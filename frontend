@@ -742,13 +742,6 @@ const VaultClubWebsite = () => {
               totalContractBalance: (parseFloat(club.totalContractBalance || "0") + contractWeeklyAmount).toString()
             };
             
-            console.log(`Updated club ${newClub.contractAddress.slice(0,8)} (${club.rigorLevel}):`, {
-              weeklyAmount: contractWeeklyAmount,
-              strand1: strand1Addition,
-              strand2: strand2Addition,
-              strand3: strand3Addition,
-              newTotal: newClub.totalContractBalance
-            });
             
             return newClub;
           }

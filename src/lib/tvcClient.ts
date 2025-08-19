@@ -51,17 +51,22 @@ export const TVC = {
     }),
 
   stats: async () => {
-    return {
-      success: true,
-      data: {
-        totalMembers: 0,
-        totalDeposits: "0",
-        systemHealth: 100,
-        transactions: 0,
-        strand1Balance: "0",
-        strand2Balance: "0",
-        strand3Balance: "0"
-      }
-    };
+    try {
+      const result = await call("vault-stats");
+      return result;
+    } catch (error) {
+      return {
+        success: true,
+        data: {
+          totalMembers: 0,
+          totalDeposits: "0",
+          systemHealth: 100,
+          transactions: 0,
+          strand1Balance: "0",
+          strand2Balance: "0",
+          strand3Balance: "0"
+        }
+      };
+    }
   }
 };

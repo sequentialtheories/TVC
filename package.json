@@ -4,7 +4,9 @@
   "description": "The Vault Club Frontend",
   "main": "frontend",
   "type": "module",
-  "dependencies": {},
+  "dependencies": {
+    "@0xsequence/waas": "^1.0.0"
+  },
   "scripts": {
     "dev": "python3 -m http.server 8000",
     "build": "echo 'No build step required for single-file frontend'"

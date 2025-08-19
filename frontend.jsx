@@ -1765,8 +1765,8 @@ const VaultClubWebsite = () => {
             </div>
             <div className="text-center p-4 bg-white/10 rounded-lg">
               <div className="text-2xl font-bold text-slate-800">
-                {parseFloat(vaultStats.totalDeposits || "0") > 0 && parseFloat(vaultBalance) > 0 
-                  ? ((parseFloat(vaultBalance) / parseFloat(vaultStats.totalDeposits)) * 100).toFixed(1)
+                {parseFloat(vaultStats?.totalDeposits || "0") > 0 && parseFloat(vaultBalance) > 0 
+                  ? ((parseFloat(vaultBalance) / parseFloat(vaultStats?.totalDeposits || "0")) * 100).toFixed(1)
                   : 0}%
               </div>
               <div className="text-sm text-slate-600">Ownership Share</div>

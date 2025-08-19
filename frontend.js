@@ -1,35 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { Database, Settings, User, Users, TrendingUp, Info, X, Bitcoin, DollarSign, Zap, Shield, ArrowLeft, Wallet, Home, Share2, MessageSquare, Heart, Reply, Plus, Filter, Search } from 'lucide-react';
 
-// Replace with your actual contract address and ABI
-const VAULT_CONTRACT_ADDRESS = "0xYourVaultContractAddressHere";
-const VAULT_CONTRACT_ABI = [
-  "function balanceOf(address) view returns (uint256)",
-  "function deposit(uint256 amount) external",
-  "function harvestAndRoute() external",
-  "function getTotalMembers() view returns (uint256)",
-  "function getMemberInfo(address) view returns (uint256, uint256, bool)",
-  "function getVaultStats() view returns (uint256, uint256, uint256, uint256)",
-  // Add other contract functions as needed
-];
 
-// Connect wallet and return address or null
 async function connectWallet() {
   try {
-    const { signInWithSequence } = await import('./src/lib/sequenceAuth.js');
+    const { signInWithSequence, submitOtpCode } = await import('./src/lib/sequenceAuth.js');
     
-    const email = prompt("Enter your email for wallet creation:") || "demo@example.com";
+    const email = prompt("Enter your email for wallet creation:");
+    if (!email) return null;
     
     const result = await signInWithSequence(email);
+    
+    if (result.otpResolver) {
+      const otpCode = prompt("Enter the 6-digit verification code sent to your email:");
+      if (!otpCode) return null;
+      
+      const otpResult = await submitOtpCode(result.otpResolver, otpCode);
+      if (!otpResult.success) {
+        throw new Error(otpResult.error || 'OTP verification failed');
+      }
+      
+      const { sequenceWaas } = await import('./src/lib/sequenceAuth.js');
+      const walletAddress = await sequenceWaas.getAddress();
+      return walletAddress;
+    }
+    
     if (result.success && result.wallet) {
       return result.wallet;
     } else {
-      alert(`Wallet connection failed: ${result.error}`);
-      return null;
+      throw new Error(result.error || 'Wallet connection failed');
     }
   } catch (error) {
-    console.error("Wallet connection error:", error);
-    alert("Failed to connect wallet. Please try again.");
     return null;
   }
 }
@@ -117,10 +118,13 @@ async function getBitcoinPrice() {
   }
 }
 
-// Get member allocation data from contract
 async function getMemberAllocation() {
-  // Return empty array since no real deposits have been made
-  return [];
+  try {
+    const { TVC } = await import('./src/lib/tvcClient.js');
+    return [];
+  } catch (error) {
+    return [];
+  }
 }
 
 // Deposit amount (in ether) to vault contract
@@ -133,18 +137,15 @@ async function depositToVault(amountEther) {
     );
     
     if (userSubclubs.length === 0) {
-      alert("Please join a subclub before depositing.");
       return false;
     }
     
     const subclub_id = userSubclubs[0].id;
     const result = await TVC.deposit(subclub_id, parseFloat(amountEther));
     
-    console.log(`Deposit successful:`, result);
     return true;
   } catch (error) {
     console.error("Deposit failed:", error);
-    alert(`Deposit failed: ${error.message}`);
     return false;
   }
 }
@@ -159,19 +160,15 @@ async function harvestAndRoute() {
     );
     
     if (userSubclubs.length === 0) {
-      alert("Please join a subclub before harvesting.");
       return false;
     }
     
     const subclub_id = userSubclubs[0].id;
     const result = await TVC.harvest(subclub_id);
     
-    console.log(`Harvest successful:`, result);
-    alert(`Harvest successful! Yield: ${result.data.total_yield_usdc} USDC`);
     return true;
   } catch (error) {
     console.error("Harvest failed:", error);
-    alert(`Harvest failed: ${error.message}`);
     return false;
   }
 }
@@ -268,7 +265,6 @@ const VaultClubWebsite = () => {
           )
         );
         
-        alert(`✅ Successfully joined subclub contract!\n\n${contractToJoin.lockupPeriod} ${contractToJoin.isChargedContract ? 'Month' : 'Year'} Lockup • ${contractToJoin.rigorLevel.charAt(0).toUpperCase() + contractToJoin.rigorLevel.slice(1)} Rigor\n\nYou can now start making deposits according to the contract schedule.`);
         
         // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -276,15 +272,6 @@ const VaultClubWebsite = () => {
         // Contract not found, full, private, or user already a member
         const existingContract = deployedSubclubs.find(club => club.contractAddress === joinContractId);
         if (existingContract) {
-          if (existingContract.isPrivate) {
-            alert('❌ This is a private contract. You need a direct invitation from the contract owner.');
-          } else if (existingContract.currentMembers >= existingContract.maxMembers) {
-            alert('❌ This contract is full. No more members can join.');
-          } else if (existingContract.members && existingContract.members.includes(walletAddress)) {
-            alert('ℹ️ You are already a member of this contract.');
-          }
-        } else {
-          alert('❌ Contract not found. The link may be invalid or the contract may not be deployed yet.');
         }
         
         // Clean up URL
@@ -331,37 +318,6 @@ const VaultClubWebsite = () => {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    const initializeWallet = async () => {
-      if (window.ethereum) {
-        try {
-          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-          if (accounts.length > 0) {
-            setWalletConnected(true);
-            setWalletAddress(accounts[0]);
-            const balance = await getVaultBalance(accounts[0]);
-            setVaultBalance(balance);
-          }
-          
-          window.ethereum.on('accountsChanged', async (accounts) => {
-            if (accounts.length === 0) {
-              setWalletConnected(false);
-              setWalletAddress(null);
-              setVaultBalance("0");
-            } else {
-              setWalletConnected(true);
-              setWalletAddress(accounts[0]);
-              const balance = await getVaultBalance(accounts[0]);
-              setVaultBalance(balance);
-            }
-          });
-        } catch (error) {
-          console.error("Error initializing wallet:", error);
-        }
-      }
-    };
-    initializeWallet();
-  }, []);
 
   // Calculate simulation data using RRL formula with dynamic APYs
   const calculateSimulation = () => {
@@ -536,7 +492,6 @@ const VaultClubWebsite = () => {
 
   const calculateWeeklyDepositAmount = () => {
     if (!walletConnected || !walletAddress) {
-      console.log("Debug: Wallet not connected");
       return 0;
     }
     
@@ -545,13 +500,7 @@ const VaultClubWebsite = () => {
       club.members && club.members.includes(walletAddress)
     );
     
-    console.log("Debug calculateWeeklyDepositAmount:");
-    console.log("- Deployed subclubs:", deployedSubclubs.length);
-    console.log("- User subclubs:", userSubclubs.length);
-    console.log("- Wallet address:", walletAddress);
-    
     if (userSubclubs.length === 0) {
-      console.log("Debug: No user subclubs found");
       return 0;
     }
     
@@ -633,11 +582,9 @@ const VaultClubWebsite = () => {
         }
       }
       
-      console.log(`- Contract ${subclub.contractAddress.slice(0,8)}: ${subclub.rigorLevel} = ${amount}/week`);
       return total + amount;
     }, 0);
     
-    console.log("Debug: Total weekly deposit amount:", totalAmount);
     return totalAmount;
   };
 
@@ -683,35 +630,22 @@ const VaultClubWebsite = () => {
   const handleDeposit = async () => {
     const weeklyAmount = calculateWeeklyDepositAmount();
     
-    console.log("Debug deposit - Weekly amount:", weeklyAmount);
-    console.log("Debug deposit - User contracts:", deployedSubclubs.filter(club => 
-      club.members && club.members.includes(walletAddress)
-    ));
     
     if (weeklyAmount === 0) {
-      alert("You must join at least one subclub before depositing.");
       return;
     }
     
     if (!canDeposit()) {
-      const daysLeft = getDaysUntilNextDeposit();
-      alert(`You can deposit again in ${daysLeft} day${daysLeft === 1 ? '' : 's'}.`);
       return;
     }
     
     const success = await depositToVault(weeklyAmount);
     if (success) {
-      console.log("Deposit successful, updating balances...");
-      
-      // Update individual strand balances for each contract the user is in
       const userContracts = deployedSubclubs.filter(club => 
         club.members && club.members.includes(walletAddress)
       );
       
-      console.log("User contracts found:", userContracts.length);
-      
       if (userContracts.length === 0) {
-        alert("Error: No contracts found for user. Please create or join a subclub first.");
         return;
       }
       
@@ -721,8 +655,6 @@ const VaultClubWebsite = () => {
       const strand2PerContract = amountPerContract * 0.60;
       const strand3PerContract = amountPerContract * 0.30;
       
-      console.log("Amount per contract:", amountPerContract);
-      console.log("Strand allocations:", { strand1PerContract, strand2PerContract, strand3PerContract });
       
       // Update each contract's balances proportionally based on their rigor requirements
       setDeployedSubclubs(prev => {
@@ -810,13 +742,6 @@ const VaultClubWebsite = () => {
               totalContractBalance: (parseFloat(club.totalContractBalance || "0") + contractWeeklyAmount).toString()
             };
             
-            console.log(`Updated club ${newClub.contractAddress.slice(0,8)} (${club.rigorLevel}):`, {
-              weeklyAmount: contractWeeklyAmount,
-              strand1: strand1Addition,
-              strand2: strand2Addition,
-              strand3: strand3Addition,
-              newTotal: newClub.totalContractBalance
-            });
             
             return newClub;
           }
@@ -829,7 +754,6 @@ const VaultClubWebsite = () => {
       setVaultBalance(prev => {
         const currentTotal = parseFloat(prev);
         const newTotal = (currentTotal + weeklyAmount).toString();
-        console.log("Updated vault balance:", newTotal);
         return newTotal;
       });
       
@@ -841,17 +765,14 @@ const VaultClubWebsite = () => {
           totalDeposits: (parseFloat(prev.totalDeposits) + weeklyAmount).toString(),
           transactions: prev.transactions + 1
         };
-        console.log("Updated vault stats:", updated);
         return updated;
       });
       
-      console.log("All state updates completed");
     }
   };
 
   const handleCreateClub = async () => {
     if (!walletConnected) {
-      alert("Please connect your wallet first");
       return;
     }
     
@@ -870,7 +791,6 @@ const VaultClubWebsite = () => {
         clubCreationData.lockupPeriod
       );
       
-      console.log('Subclub created:', result);
       
       const colors = [
         'border-yellow-500',   
@@ -921,11 +841,8 @@ const VaultClubWebsite = () => {
         customSchedule: []
       });
       
-      console.log("New subclub created:", newSubclub);
-      alert(`Subclub created successfully!\nContract: ${result.data.subclub_id}`);
     } catch (error) {
       console.error("Failed to create subclub:", error);
-      alert(`Failed to create subclub: ${error.message}`);
     }
   };
 
@@ -1775,7 +1692,7 @@ const VaultClubWebsite = () => {
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                 <span className="font-medium">Connected: {walletAddress ? walletAddress.slice(0,6) + "..." + walletAddress.slice(-4) : "N/A"}</span>
               </div>
-              <div className="text-sm text-slate-600 mb-4">MetaMask • Polygon Network</div>
+              <div className="text-sm text-slate-600 mb-4">Sequence Wallet • Amoy Testnet</div>
               
               <div className="flex justify-center space-x-3 mt-6">
                 <div className="text-center">
@@ -2001,7 +1918,6 @@ const VaultClubWebsite = () => {
                           });
                         } else {
                           // Final fallback - show the URL in an alert
-                          alert(`Share this link:\n\n${shareUrl}\n\nOr copy this message:\n\n${shareText}`);
                         }
                       });
                     }}
@@ -2082,7 +1998,6 @@ const VaultClubWebsite = () => {
                               className="text-xs px-3 py-1 rounded-full transition-colors bg-green-500 hover:bg-green-600 text-white"
                               onClick={() => {
                                 // Join contract logic here
-                                alert(`Joining contract ${subclub.contractAddress.slice(0,8)}...`);
                               }}
                             >
                               Join
@@ -2125,30 +2040,54 @@ const VaultClubWebsite = () => {
       ? forumPosts 
       : forumPosts.filter(post => post.category === selectedForumCategory);
 
-    const handleCreatePost = () => {
+    const handleCreatePost = async () => {
       if (!newPostTitle.trim() || !newPostContent.trim()) {
-        alert('Please fill in both title and content');
         return;
       }
 
-      const newPost = {
-        id: forumPosts.length + 1,
-        title: newPostTitle,
-        author: walletConnected ? `${walletAddress?.slice(0,6)}...${walletAddress?.slice(-4)}` : 'Anonymous',
-        timestamp: 'Just now',
-        category: newPostCategory,
-        replies: 0,
-        likes: 0,
-        preview: newPostContent.length > 100 ? newPostContent.substring(0, 100) + '...' : newPostContent,
-        tags: ['New Post'],
-        isSticky: false
-      };
+      try {
+        const response = await fetch(`${window.__TVC_CONFIG.functionsBase}/forum-create-topic`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-vault-club-api-key': window.__TVC_CONFIG.vaultClubApiKey,
+            ...(localStorage.getItem("sb-access-token") 
+              ? { 'authorization': `Bearer ${localStorage.getItem("sb-access-token")}` } 
+              : {})
+          },
+          body: JSON.stringify({
+            title: newPostTitle,
+            body: newPostContent,
+            category: newPostCategory
+          })
+        });
 
-      setForumPosts(prev => [newPost, ...prev]);
-      setNewPostTitle('');
-      setNewPostContent('');
-      setShowNewPostModal(false);
-      alert('Post created successfully!');
+        if (!response.ok) {
+          throw new Error('Failed to create post');
+        }
+
+        const result = await response.json();
+        
+        const newPost = {
+          id: result.data.id,
+          title: newPostTitle,
+          author: walletConnected ? `${walletAddress?.slice(0,6)}...${walletAddress?.slice(-4)}` : 'Anonymous',
+          timestamp: 'Just now',
+          category: newPostCategory,
+          replies: 0,
+          likes: 0,
+          preview: newPostContent.length > 100 ? newPostContent.substring(0, 100) + '...' : newPostContent,
+          tags: ['New Post'],
+          isSticky: false
+        };
+
+        setForumPosts(prev => [newPost, ...prev]);
+        setNewPostTitle('');
+        setNewPostContent('');
+        setShowNewPostModal(false);
+      } catch (error) {
+        console.error('Failed to create post:', error);
+      }
     };
 
     return (

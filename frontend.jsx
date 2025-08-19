@@ -4,7 +4,7 @@ import { Database, Settings, User, Users, TrendingUp, Info, X, Bitcoin, DollarSi
 
 async function connectWallet() {
   try {
-    const { signInWithSequence, submitOtpCode } = await import('./src/lib/sequenceAuth.js');
+    const { signInWithSequence, submitOtpCode } = await import('./src/lib/sequenceAuth.ts');
     
     const email = prompt("Enter your email for wallet creation:");
     if (!email) return null;
@@ -20,7 +20,7 @@ async function connectWallet() {
         throw new Error(otpResult.error || 'OTP verification failed');
       }
       
-      const { sequenceWaas } = await import('./src/lib/sequenceAuth.js');
+      const { sequenceWaas } = await import('./src/lib/sequenceAuth.ts');
       const walletAddress = await sequenceWaas.getAddress();
       return walletAddress;
     }
@@ -38,7 +38,7 @@ async function connectWallet() {
 // Get vault balance for address - fallback version without ethers dependency
 async function getVaultBalance(address) {
   try {
-    const { TVC } = await import('./src/lib/tvcClient.js');
+    const { TVC } = await import('./src/lib/tvcClient.ts');
     return "0";
   } catch (error) {
     console.error("Error fetching vault balance:", error);
@@ -49,7 +49,7 @@ async function getVaultBalance(address) {
 // Get vault stats from contract - fallback version
 async function getVaultStats() {
   try {
-    const { TVC } = await import('./src/lib/tvcClient.js');
+    const { TVC } = await import('./src/lib/tvcClient.ts');
     const result = await TVC.stats();
     return result.data;
   } catch (error) {
@@ -120,7 +120,7 @@ async function getBitcoinPrice() {
 
 async function getMemberAllocation() {
   try {
-    const { TVC } = await import('./src/lib/tvcClient.js');
+    const { TVC } = await import('./src/lib/tvcClient.ts');
     return [];
   } catch (error) {
     return [];
@@ -130,7 +130,7 @@ async function getMemberAllocation() {
 // Deposit amount (in ether) to vault contract
 async function depositToVault(amountEther) {
   try {
-    const { TVC } = await import('./src/lib/tvcClient.js');
+    const { TVC } = await import('./src/lib/tvcClient.ts');
     
     const userSubclubs = deployedSubclubs.filter(club => 
       club.members && club.members.includes(walletAddress)
@@ -153,7 +153,7 @@ async function depositToVault(amountEther) {
 // Harvest and route yields
 async function harvestAndRoute() {
   try {
-    const { TVC } = await import('./src/lib/tvcClient.js');
+    const { TVC } = await import('./src/lib/tvcClient.ts');
     
     const userSubclubs = deployedSubclubs.filter(club => 
       club.members && club.members.includes(walletAddress)
@@ -777,7 +777,7 @@ const VaultClubWebsite = () => {
     }
     
     try {
-      const { TVC } = await import('./src/lib/tvcClient.js');
+      const { TVC } = await import('./src/lib/tvcClient.ts');
       
       const rigorMapping = {
         'light': 'LIGHT',
@@ -1946,10 +1946,15 @@ const VaultClubWebsite = () => {
               </div>
             </div>
             <button 
-              onClick={() => setActiveModal('createClub')}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+              onClick={walletConnected ? () => setActiveModal('createClub') : undefined}
+              disabled={!walletConnected}
+              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                walletConnected 
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer' 
+                  : 'bg-gray-400 text-gray-600 cursor-not-allowed'
+              }`}
             >
-              Create New Subclub
+              {walletConnected ? 'Create New Subclub' : 'Connect Wallet to Create'}
             </button>
           </div>
 

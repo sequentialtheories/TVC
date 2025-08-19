@@ -1604,7 +1604,7 @@ const VaultClubWebsite = () => {
                 <div className="font-semibold text-slate-800">AAVE Protocol</div>
                 <div className="text-sm text-slate-600">Lending & Borrowing</div>
               </div>
-              <span className="w-4 h-4 text-slate-500 group-hover:text-slate-700 rotate-45">↗</span>
+              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">→</div>
             </a>
 
             <a 
@@ -1617,7 +1617,7 @@ const VaultClubWebsite = () => {
                 <div className="font-semibold text-slate-800">QuickSwap</div>
                 <div className="text-sm text-slate-600">DEX & LP Staking</div>
               </div>
-              <span className="w-4 h-4 text-slate-500 group-hover:text-slate-700 rotate-45">↗</span>
+              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">→</div>
             </a>
 
             <a 
@@ -1630,7 +1630,7 @@ const VaultClubWebsite = () => {
                 <div className="font-semibold text-slate-800">Polygon Network</div>
                 <div className="text-sm text-slate-600">Layer 2 Scaling</div>
               </div>
-              <span className="w-4 h-4 text-slate-500 group-hover:text-slate-700 rotate-45">↗</span>
+              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">→</div>
             </a>
 
             <a 
@@ -1643,7 +1643,7 @@ const VaultClubWebsite = () => {
                 <div className="font-semibold text-slate-800">Coinbase Education</div>
                 <div className="text-sm text-slate-600">Learn Crypto</div>
               </div>
-              <span className="w-4 h-4 text-slate-500 group-hover:text-slate-700 rotate-45">↗</span>
+              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">→</div>
             </a>
 
             <a 
@@ -1656,7 +1656,7 @@ const VaultClubWebsite = () => {
                 <div className="font-semibold text-slate-800">CoinGecko</div>
                 <div className="text-sm text-slate-600">Crypto Market Data</div>
               </div>
-              <span className="w-4 h-4 text-slate-500 group-hover:text-slate-700 rotate-45">↗</span>
+              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">→</div>
             </a>
 
             <a 
@@ -1669,7 +1669,7 @@ const VaultClubWebsite = () => {
                 <div className="font-semibold text-slate-800">TradingView</div>
                 <div className="text-sm text-slate-600">Charts & Analysis</div>
               </div>
-              <span className="w-4 h-4 text-slate-500 group-hover:text-slate-700 rotate-45">↗</span>
+              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">→</div>
             </a>
           </div>
         </div>

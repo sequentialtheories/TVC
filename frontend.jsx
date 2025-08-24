@@ -2,44 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { Database, Settings, User, Users, TrendingUp, Info, X, Bitcoin, DollarSign, Zap, Shield, ArrowLeft, Wallet, Home, Share2, MessageSquare, Heart, Reply, Plus, Filter, Search } from 'lucide-react';
 
 
-async function connectWallet() {
+async function connectWallet(email, password) {
   try {
-    return null;
-    
     const { authenticateWithSequenceTheory, createSequenceTheoryAccount } = await import('./src/lib/sequenceAuth.js');
-    
-    // Try to authenticate with existing account first
+
     const authResult = await authenticateWithSequenceTheory(email, password);
-    
-    if (authResult.success) {
+    if (authResult?.success) {
       if (authResult.session?.access_token) {
         localStorage.setItem("sb-access-token", authResult.session.access_token);
         localStorage.setItem("sb-refresh-token", authResult.session.refresh_token || '');
       }
-      console.log('✅ Authenticated existing user:', authResult.user.email);
       return authResult.wallet?.address || null;
-    } else {
-      console.log('Authentication failed, trying to create new account...');
-      const createResult = await createSequenceTheoryAccount(email, password);
-      
-      if (createResult.success) {
-        if (createResult.session?.access_token) {
-          localStorage.setItem("sb-access-token", createResult.session.access_token);
-          localStorage.setItem("sb-refresh-token", createResult.session.refresh_token || '');
-        }
-        console.log('✅ Created new user account:', createResult.user.email);
-        return createResult.wallet?.address || null;
-      } else {
-        throw new Error(createResult.error || 'Authentication and account creation both failed');
-      }
     }
+
+    const createResult = await createSequenceTheoryAccount(email, password);
+    if (createResult?.success) {
+      if (createResult.session?.access_token) {
+        localStorage.setItem("sb-access-token", createResult.session.access_token);
+        localStorage.setItem("sb-refresh-token", createResult.session.refresh_token || '');
+      }
+      return createResult.wallet?.address || null;
+    }
+
+    throw new Error(createResult?.error || 'Authentication and account creation both failed');
   } catch (error) {
     console.error('Wallet connection error:', error);
-    if (error.message.includes('Invalid Vault Club API key')) {
-      alert('Authentication service temporarily unavailable. Please try again later.');
-    } else {
-      alert('Authentication failed: ' + error.message);
-    }
+    alert('Authentication failed: ' + (error instanceof Error ? error.message : String(error)));
     return null;
   }
 }
@@ -644,6 +632,9 @@ const VaultClubWebsite = () => {
         
         if (authResult.success) {
           localStorage.setItem("sb-access-token", authResult.session.access_token);
+          if (authResult.session?.refresh_token) {
+            localStorage.setItem("sb-refresh-token", authResult.session.refresh_token);
+          }
           setWalletAddress(authResult.wallet.address);
           setWalletConnected(true);
           setShowAuthModal(false);
@@ -654,6 +645,7 @@ const VaultClubWebsite = () => {
           const balance = await getVaultBalance(authResult.wallet.address);
           setVaultBalance(balance);
           setVaultStats({ totalMembers: 0, totalDeposits: 0, vaultHealth: 100 });
+          setCurrentPage('personal');
           
           console.log('✅ Existing user signed in:', authResult.wallet.address);
         } else {
@@ -665,6 +657,9 @@ const VaultClubWebsite = () => {
         
         if (createResult.success) {
           localStorage.setItem("sb-access-token", createResult.session.access_token);
+          if (createResult.session?.refresh_token) {
+            localStorage.setItem("sb-refresh-token", createResult.session.refresh_token);
+          }
           setWalletAddress(createResult.wallet.address);
           setWalletConnected(true);
           setShowAuthModal(false);
@@ -675,6 +670,7 @@ const VaultClubWebsite = () => {
           const balance = await getVaultBalance(createResult.wallet.address);
           setVaultBalance(balance);
           setVaultStats({ totalMembers: 0, totalDeposits: 0, vaultHealth: 100 });
+          setCurrentPage('personal');
           
           console.log('✅ New account created and signed in:', createResult.wallet.address);
         } else {
@@ -1799,7 +1795,7 @@ const VaultClubWebsite = () => {
                 <div className="font-semibold text-slate-800">AAVE Protocol</div>
                 <div className="text-sm text-slate-600">Lending & Borrowing</div>
               </div>
-              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">→</div>
+              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">&gt;</div>
             </a>
 
             <a 
@@ -1812,7 +1808,7 @@ const VaultClubWebsite = () => {
                 <div className="font-semibold text-slate-800">QuickSwap</div>
                 <div className="text-sm text-slate-600">DEX & LP Staking</div>
               </div>
-              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">→</div>
+              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">&gt;</div>
             </a>
 
             <a 
@@ -1825,7 +1821,7 @@ const VaultClubWebsite = () => {
                 <div className="font-semibold text-slate-800">Polygon Network</div>
                 <div className="text-sm text-slate-600">Layer 2 Scaling</div>
               </div>
-              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">→</div>
+              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">&gt;</div>
             </a>
 
             <a 
@@ -1838,7 +1834,7 @@ const VaultClubWebsite = () => {
                 <div className="font-semibold text-slate-800">Coinbase Education</div>
                 <div className="text-sm text-slate-600">Learn Crypto</div>
               </div>
-              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">→</div>
+              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">&gt;</div>
             </a>
 
             <a 
@@ -1851,7 +1847,7 @@ const VaultClubWebsite = () => {
                 <div className="font-semibold text-slate-800">CoinGecko</div>
                 <div className="text-sm text-slate-600">Crypto Market Data</div>
               </div>
-              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">→</div>
+              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">&gt;</div>
             </a>
 
             <a 
@@ -1864,7 +1860,7 @@ const VaultClubWebsite = () => {
                 <div className="font-semibold text-slate-800">TradingView</div>
                 <div className="text-sm text-slate-600">Charts & Analysis</div>
               </div>
-              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">→</div>
+              <div className="w-4 h-4 text-slate-500 group-hover:text-slate-700">&gt;</div>
             </a>
           </div>
         </div>
